@@ -1,0 +1,143 @@
+# Scope: Vanilla HTML, CSS, JavaScript only + Bootstrap via CDN
+
+#Context: Build a secure, interactive web platform for:
+    User verification
+    MFA
+    Admin oversight (Whitney)
+    BioTrust Passport (QR)
+    public data-based risk triage (Top 20%)
+Focus: functionality, security, interactivity.
+De-emphasize: visual flair.
+
+## Tech Stack (enforced)
+- Allowed: HTML5, CSS3, vanilla JavaScript.
+- Allowed UI: Bootstrap 5.x via official CDN (CSS + bundled JS). No other UI libs.
+- Backend: C# (.NET 6/7/8), Program.cs as backend entrypoint, REST API (JSON responses)
+- Database: MySQL (Heroku JawsDB)
+- Data Intake: Parsed → normalized → stored → scored
+- Disallowed: Node/NPM, package managers, bundlers (Vite/Webpack/Rollup/Parcel), transpilers (TypeScript/Babel), SSR, frameworks (React/Vue/Svelte/Angular/Next/Nuxt/etc.), jQuery, Tailwind, utility CSS frameworks, component libraries besides Bootstrap.
+- No server code. Keep everything as static assets. If a server is needed for local testing, use a simple static file server with no build step.
+- No React / Vue / Angular / Svelte, No NextJS / Nuxt / Astro, No Node.js backend or NPM tooling, No Webpack / Vite / Parcel / Rollup, No Tailwind or CSS frameworks beyond Bootstrap, No jQuery, No external clouds beyond Heroku, No ORMs unless extremely lightweight, No AI libraries, No SSR frameworks, No client-side secure logic (must be server-side)
+
+
+##File Structure
+/api
+/Client
+    styles/
+        main.css
+    scripts/
+        auth.js
+        dashboard.js
+        admin.js
+    index.html
+    login.html
+    register.html
+    verify.html
+    dashboard.html
+    admin.html
+/Database
+    schema.sql
+    migrations.sql
+Program.cs
+    Controllers/
+    Models/
+    Services/
+    Utils/
+    nvd_ingest.cs
+
+## Implementation rules
+- Prefer semantic HTML, Bootstrap utility classes, and minimal custom CSS.
+- Keep JavaScript in plain ES modules or classic scripts that run in evergreen browsers. No build-only features.
+- Place custom CSS in `styles/` and custom JS in `scripts/`. Reference them from `index.html` with relative paths.
+- Do not introduce any external dependencies beyond the Bootstrap CDN (and optionally Bootstrap Icons CDN when icons are required).
+- When offering solutions, use Bootstrap components and utilities before writing custom JS/CSS.
+- If a requirement would normally suggest a framework/library, propose a Bootstrap/vanilla alternative instead.
+
+## Bootstrap CDN (pin to 5.3.x+)
+- Always include Bootstrap via the official jsDelivr CDN, CSS first, then the bundled JS (which includes Popper). Example snippet:
+
+```html
+<!-- Bootstrap 5 CSS -->
+<link
+  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+  rel="stylesheet"
+  integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+  crossorigin="anonymous"
+/>
+
+<!-- Bootstrap 5 JS (bundle includes Popper) -->
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+  integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+  crossorigin="anonymous"
+></script>
+```
+
+## Preferred starter skeleton
+- Use this structure when creating new pages.
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>App</title>
+
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+
+    <!-- Custom CSS (optional) -->
+    <link rel="stylesheet" href="./styles/main.css" />
+  </head>
+  <body>
+    <div class="container py-4">
+      <h1 class="h3">Hello</h1>
+      <p class="text-secondary">Starter page.</p>
+    </div>
+
+    <!-- Bootstrap JS bundle -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- Custom JS (optional) -->
+    <script src="./scripts/main.js"></script>
+  </body>
+</html>
+```
+
+##NVD Workflow Rules
+- Ingest NVD JSON feed regularly
+- Save raw data → alerts_raw.
+- Score risks → alerts_scored.
+- Compute trust score = risk × source_weight.
+- Identify top 20% → user dashboard.
+- Admin sees all risks + unverified data.
+- Admin approval loop improves trust scoring.
+
+##Security Requirements (strict)
+- HTTPS enforced in production.
+- No plaintext passwords.
+- HttpOnly cookies (or secure JWT).
+- Validate all inputs server-side.
+- Never expose passport hash directly (only signed QR).
+- Rate limit sensitive endpoints.
+- Maintain audit logs
+
+## Coding style
+- Keep HTML accessible; prefer Bootstrap utilities over custom CSS where feasible.
+- Organize scripts with small, reusable functions; avoid global state.
+- No heavy formatting frameworks; keep Prettier defaults unless the user provides a config.
+
+## Assistant behavior
+- Never propose adding tooling beyond the allowed stack.
+- If a task seems to require disallowed tech, explain a Bootstrap/vanilla approach instead.
+- Provide concrete code with minimal explanation unless asked otherwise.
