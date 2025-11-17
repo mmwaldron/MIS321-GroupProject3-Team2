@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bio-Isac | BioTrust Passport</title>
+
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="./styles/main.css" />
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-success">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="index.html">
+          <span class="logo-text">BIO-ISAC</span>
+          <span class="logo-accent">.</span>
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html">Verification</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="admin.html">Admin</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container my-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="passport-card" id="passportCard">
+            <div class="passport-header">
+              <div class="passport-logo">
+                <i class="bi bi-shield-check"></i>
+              </div>
+              <div class="passport-title">
+                <h2 class="mb-0">BIOTRUST PASSPORT</h2>
+                <p class="text-muted mb-0">Digital Identity Verification</p>
+              </div>
+            </div>
+
+            <div class="passport-body">
+              <div class="row">
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Full Name</label>
+                    <div class="field-value" id="passportName">-</div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Email</label>
+                    <div class="field-value" id="passportEmail">-</div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Organization</label>
+                    <div class="field-value" id="passportOrg">-</div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Verification Status</label>
+                    <div class="field-value">
+                      <span class="badge bg-success" id="passportStatus">Verified</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Trust Score</label>
+                    <div class="field-value">
+                      <span class="trust-badge" id="passportTrustScore">0</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Access Tier</label>
+                    <div class="field-value" id="passportTier">-</div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Issued Date</label>
+                    <div class="field-value" id="passportDate">-</div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                  <div class="passport-field">
+                    <label>Passport Code</label>
+                    <div class="field-value passport-id" id="passportCode">-</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="passport-footer">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <small class="text-muted">Bio-Isac Verification System</small>
+                </div>
+                <div>
+                  <button class="btn btn-sm btn-outline-success" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Print
+                  </button>
+                  <button class="btn btn-sm btn-success" onclick="downloadPassport()">
+                    <i class="bi bi-download"></i> Download
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Message Admin Section -->
+          <div class="card mt-4">
+            <div class="card-body">
+              <h5 class="card-title">Contact Admin</h5>
+              <form id="messageForm">
+                <div class="mb-3">
+                  <label class="form-label">Subject</label>
+                  <input
+                    type="text"
+                    class="form-control bg-dark text-light border-success"
+                    id="messageSubject"
+                    required
+                  />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Message</label>
+                  <textarea
+                    class="form-control bg-dark text-light border-success"
+                    id="messageText"
+                    rows="4"
+                    required
+                  ></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">
+                  <i class="bi bi-send"></i> Send Message
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert Notifications -->
+    <div class="alert-container" id="alertContainer"></div>
+
+    <!-- Bootstrap JS bundle -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- Custom JS -->
+    <script src="./scripts/database.js"></script>
+    <script src="./scripts/trustScore.js"></script>
+    <script src="./scripts/messaging.js"></script>
+    <script src="./scripts/main.js"></script>
+    <script>
+      // Load passport data
+      document.addEventListener('DOMContentLoaded', function () {
+        // Check for passport code in URL or localStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        const passportCode = urlParams.get('code') || localStorage.getItem('currentPassportCode');
+        
+        if (!passportCode) {
+          window.location.href = 'index.html';
+          return;
+        }
+
+        // Find user by passport code
+        const users = Database.getUsers();
+        const user = users.find(u => u.passportCode === passportCode || u.passportId === passportCode);
+        
+        if (!user || !user.verified) {
+          showAlert('Invalid or unverified passport code.', 'danger');
+          setTimeout(() => {
+            window.location.href = 'index.html';
+          }, 2000);
+          return;
+        }
+
+        // Store for messaging
+        localStorage.setItem('currentUserId', user.id);
+        localStorage.setItem('currentPassportCode', passportCode);
+
+        // Populate passport
+        document.getElementById('passportName').textContent = user.name;
+        document.getElementById('passportEmail').textContent = user.email;
+        document.getElementById('passportOrg').textContent = user.organization;
+        document.getElementById('passportTrustScore').textContent = user.trustScore || 0;
+        document.getElementById('passportTier').textContent = TrustScore.getTier(user.trustScore || 0);
+        document.getElementById('passportDate').textContent = new Date(user.verifiedAt).toLocaleDateString();
+        document.getElementById('passportCode').textContent = passportCode;
+      });
+
+      function downloadPassport() {
+        window.print();
+      }
+    </script>
+  </body>
+</html>
+
