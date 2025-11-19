@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MIS321-GroupProject3-Team2")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+399170c50307b2d3096e11af5c3de9a281a9161f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f2efe4fcffd82fc2d98897be88f82fa80e27192f")]
 [assembly: System.Reflection.AssemblyProductAttribute("MIS321-GroupProject3-Team2")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MIS321-GroupProject3-Team2")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
