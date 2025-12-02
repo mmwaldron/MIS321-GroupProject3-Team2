@@ -30,7 +30,15 @@ function formatPassportCode(input) {
 // Lookup passport by code
 async function lookupPassport(event) {
   event.preventDefault();
-  const code = document.getElementById('passportCodeInput').value.trim();
+  
+  const passportCodeInput = document.getElementById('passportCodeInput');
+  if (!passportCodeInput) {
+    console.error('Passport code input not found');
+    showAlert('Form field not found. Please refresh the page.', 'danger');
+    return;
+  }
+  
+  const code = passportCodeInput.value.trim();
   
   if (!code || code.length !== 10 || !/^\d{10}$/.test(code)) {
     showAlert('Please enter a valid 10-digit passport code.', 'danger');
@@ -55,8 +63,68 @@ async function lookupPassport(event) {
   }
 }
 
+// Check user status and display banner
+async function checkUserStatus() {
+  const userId = localStorage.getItem('currentUserId');
+  if (!userId) return;
+
+  try {
+    const user = await API.getUser(userId);
+    const statusBanner = document.getElementById('userStatusBanner');
+    const pendingCard = document.getElementById('pendingStatusCard');
+    const approvedCard = document.getElementById('approvedStatusCard');
+    
+    if (!statusBanner || !pendingCard || !approvedCard) return;
+
+    if (user.verified) {
+      // User is approved - show approved status and try to get passport code
+      statusBanner.style.display = 'block';
+      pendingCard.style.display = 'none';
+      approvedCard.style.display = 'block';
+      
+      // Try to get passport code
+      try {
+        const response = await API.getUserPassportCode(userId);
+        if (response && response.code) {
+          const passportCode = response.code;
+          // Display passport code in the approved card
+          const passportCodeDisplay = document.getElementById('passportCodeDisplay');
+          if (passportCodeDisplay) {
+            passportCodeDisplay.textContent = passportCode;
+            passportCodeDisplay.style.display = 'inline-block';
+          }
+          
+          // Also update the passport code input if it exists
+          const passportCodeInput = document.getElementById('passportCodeInput');
+          if (passportCodeInput) {
+            passportCodeInput.value = passportCode;
+          }
+        }
+      } catch (error) {
+        console.error('Error getting passport code:', error);
+      }
+      
+      localStorage.setItem('userStatus', 'approved');
+    } else {
+      // User is pending
+      statusBanner.style.display = 'block';
+      pendingCard.style.display = 'block';
+      approvedCard.style.display = 'none';
+      localStorage.setItem('userStatus', 'pending');
+    }
+  } catch (error) {
+    console.error('Error checking user status:', error);
+    // Clear invalid session
+    localStorage.removeItem('currentUserId');
+    localStorage.removeItem('userStatus');
+  }
+}
+
 // Check for alerts on page load
 document.addEventListener('DOMContentLoaded', async function() {
+  // Check user status first
+  await checkUserStatus();
+  
   try {
     // Check for unread alerts
     const alerts = await API.getUnreadAlerts();

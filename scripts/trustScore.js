@@ -6,7 +6,7 @@ const TrustScore = {
 
     // Positive factors
     if (verificationData.hasDocument) score += 15;
-    if (verificationData.license) score += 10;
+    if (verificationData.emailVerified) score += 10;
     if (this.isValidEmailDomain(verificationData.email)) score += 5;
     if (this.isValidOrganization(verificationData.organization)) score += 5;
 

@@ -114,6 +114,72 @@ namespace MIS321_GroupProject3_Team2.Controllers
             return Convert.ToBase64String(hash);
         }
 
+        [HttpGet("user/{userId}")]
+        public async Task<IActionResult> GetUserPassportCode(int userId)
+        {
+            try
+            {
+                var connString = ParseConnectionString(_connectionString);
+
+                using var connection = new MySqlConnection(connString);
+                await connection.OpenAsync();
+
+                // Get user to check if verified
+                using var userCmd = new MySqlCommand(
+                    "SELECT is_verified, passport_hash FROM users WHERE id = @user_id",
+                    connection);
+                userCmd.Parameters.AddWithValue("@user_id", userId);
+
+                using var userReader = await userCmd.ExecuteReaderAsync();
+                if (!userReader.Read())
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                var verifiedOrd = userReader.GetOrdinal("is_verified");
+                var passportHashOrd = userReader.GetOrdinal("passport_hash");
+                var isVerified = userReader.GetBoolean(verifiedOrd);
+                var passportHash = userReader.IsDBNull(passportHashOrd) ? null : userReader.GetString(passportHashOrd);
+                userReader.Close();
+
+                if (!isVerified || string.IsNullOrEmpty(passportHash))
+                {
+                    return BadRequest(new { message = "User not verified or no passport code assigned" });
+                }
+
+                // Get passport code from latest approved verification
+                using var verificationCmd = new MySqlCommand(
+                    "SELECT reason FROM pending_verifications WHERE user_id = @user_id AND status = 'approved' ORDER BY reviewed_at DESC LIMIT 1",
+                    connection);
+                verificationCmd.Parameters.AddWithValue("@user_id", userId);
+
+                var reasonJson = "";
+                using var verReader = await verificationCmd.ExecuteReaderAsync();
+                if (verReader.Read())
+                {
+                    var reasonOrd = verReader.GetOrdinal("reason");
+                    reasonJson = verReader.IsDBNull(reasonOrd) ? "{}" : verReader.GetString(reasonOrd);
+                }
+                verReader.Close();
+
+                // Try to extract passport code from verification data
+                var verificationData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
+                if (verificationData.ContainsKey("passportCode"))
+                {
+                    var passportCode = verificationData["passportCode"].GetString();
+                    return Ok(new { code = passportCode });
+                }
+
+                // If not stored, we can't retrieve it (security: codes are hashed)
+                // In production, you'd want to store the code when generating it
+                return BadRequest(new { message = "Passport code not available. Please contact admin." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         private static string ParseConnectionString(string connectionString)
         {
             if (connectionString.StartsWith("mysql://"))

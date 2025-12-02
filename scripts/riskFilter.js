@@ -9,7 +9,7 @@ const RiskFilter = {
       govIdFormat: this.checkGovIdFormat(verificationData.govId),
       organization: this.checkOrganization(verificationData.organization),
       documentUpload: verificationData.hasDocument ? 0 : 10,
-      licenseProvided: verificationData.license ? -5 : 0
+      companyEmailVerified: verificationData.emailVerified ? -5 : 0
     };
 
     riskScore += factors.emailDomain;
@@ -17,7 +17,7 @@ const RiskFilter = {
     riskScore += factors.govIdFormat;
     riskScore += factors.organization;
     riskScore += factors.documentUpload;
-    riskScore += factors.licenseProvided;
+    riskScore += factors.companyEmailVerified;
 
     // Normalize to 0-100 scale
     riskScore = Math.max(0, Math.min(100, riskScore));
@@ -54,7 +54,7 @@ const RiskFilter = {
 
     // Positive factors
     if (verificationData.hasDocument) credibility += 20;
-    if (verificationData.license) credibility += 15;
+    if (verificationData.emailVerified) credibility += 15;
     if (this.isValidEmailDomain(verificationData.email)) credibility += 10;
     if (this.isValidOrganization(verificationData.organization)) credibility += 10;
 
