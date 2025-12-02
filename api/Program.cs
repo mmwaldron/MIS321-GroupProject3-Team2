@@ -16,7 +16,12 @@ if (args.Length > 0 && args[0] == "migrate")
 // Add services to the container.
 
 // Get connection string
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+var configConn = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrEmpty(configConn) || configConn == "${JAWSDB_URL}")
+{
+    configConn = null;
+}
+var connectionString = configConn 
     ?? Environment.GetEnvironmentVariable("JAWSDB_URL") 
     ?? "mysql://rafzxyujgowd9c4f:u40pss81sz1ub6t8@durvbryvdw2sjcm5.cbetxkdyhwsb.us-east-1.rds.amazonaws.com:3306/p14kvqervonda4dv";
 
