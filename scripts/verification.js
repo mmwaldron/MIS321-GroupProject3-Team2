@@ -113,68 +113,81 @@ function processVerification() {
   }, 300);
 }
 
-function completeVerification() {
-  // Check if user already exists
-  let user = Database.getUserByEmail(verificationData.email);
-  
-  if (!user) {
-    user = Database.createUser({
+async function completeVerification() {
+  try {
+    // Check if user already exists, if not create one
+    let user;
+    try {
+      user = await API.getUserByEmail(verificationData.email);
+    } catch (error) {
+      // User doesn't exist, create one
+      try {
+        user = await API.createUser({
+          email: verificationData.email,
+          password: 'temp' // In a real app, user would set password during registration
+        });
+      } catch (createError) {
+        showAlert('Failed to create user account. Please try again.', 'danger');
+        return;
+      }
+    }
+
+    // Run risk assessment
+    const riskAssessment = RiskFilter.calculateRiskScore(verificationData);
+    const urgency = RiskFilter.calculateUrgency(verificationData, riskAssessment.score);
+    const credibility = RiskFilter.calculateCredibility(verificationData);
+
+    // Calculate trust score
+    const trustScore = TrustScore.calculateInitialScore(verificationData, riskAssessment);
+
+    // Create verification record via API
+    const verification = await API.createVerification({
+      userId: user.id,
       name: verificationData.name,
       email: verificationData.email,
       phone: verificationData.phone,
-      organization: verificationData.organization
+      organization: verificationData.organization,
+      govId: verificationData.govId,
+      hasDocument: verificationData.hasDocument,
+      license: verificationData.license,
+      riskScore: riskAssessment.score,
+      riskLevel: riskAssessment.level,
+      urgency,
+      credibility,
+      trustScore,
+      factors: riskAssessment.factors
     });
+
+    // Create alert for admin if high risk
+    try {
+      if (riskAssessment.level === 'high' || urgency > 70) {
+        await API.createAlert({
+          userId: user.id,
+          type: 'high_risk_verification',
+          title: 'High Risk Verification Detected',
+          message: `User ${verificationData.name} (${verificationData.email}) has been flagged for review.`,
+          priority: 'high'
+        });
+      } else {
+        await API.createAlert({
+          userId: user.id,
+          type: 'new_verification',
+          title: 'New Verification Request',
+          message: `User ${verificationData.name} (${verificationData.email}) has submitted a verification request.`,
+          priority: 'medium'
+        });
+      }
+    } catch (alertError) {
+      console.error('Failed to create alert:', alertError);
+    }
+
+    // Show result
+    goToStep(5);
+    displayVerificationResult(user, verification, riskAssessment);
+  } catch (error) {
+    console.error('Verification failed:', error);
+    showAlert('Failed to complete verification. Please try again.', 'danger');
   }
-
-  // Run risk assessment
-  const riskAssessment = RiskFilter.calculateRiskScore(verificationData);
-  const urgency = RiskFilter.calculateUrgency(verificationData, riskAssessment.score);
-  const credibility = RiskFilter.calculateCredibility(verificationData);
-
-  // Calculate trust score
-  const trustScore = TrustScore.calculateInitialScore(verificationData, riskAssessment);
-
-  // Create verification record
-  const verification = Database.createVerification({
-    userId: user.id,
-    ...verificationData,
-    riskScore: riskAssessment.score,
-    riskLevel: riskAssessment.level,
-    urgency,
-    credibility,
-    trustScore
-  });
-
-  // Update user with verification data
-  Database.updateUser(user.id, {
-    trustScore,
-    verificationId: verification.id
-  });
-
-  // Create alert for admin if high risk
-  if (riskAssessment.level === 'high' || urgency > 70) {
-    Database.createAlert({
-      type: 'high_risk_verification',
-      title: 'High Risk Verification Detected',
-      message: `User ${user.name} (${user.email}) has been flagged for review.`,
-      userId: user.id,
-      verificationId: verification.id,
-      priority: 'high'
-    });
-  } else {
-    Database.createAlert({
-      type: 'new_verification',
-      title: 'New Verification Request',
-      message: `User ${user.name} (${user.email}) has submitted a verification request.`,
-      userId: user.id,
-      verificationId: verification.id,
-      priority: 'medium'
-    });
-  }
-
-  // Show result
-  goToStep(5);
-  displayVerificationResult(user, verification, riskAssessment);
 }
 
 function displayVerificationResult(user, verification, riskAssessment) {
@@ -196,26 +209,35 @@ function displayVerificationResult(user, verification, riskAssessment) {
 
   // Store current user for later
   localStorage.setItem('currentUserId', user.id);
+  localStorage.setItem('verificationId', verification.id);
 }
 
-function updateTrustScoreDisplay(userId) {
-  const user = Database.getUser(userId);
-  if (!user) return;
+async function updateTrustScoreDisplay(userId) {
+  try {
+    const user = await API.getUser(userId);
+    if (!user) return;
 
-  const scoreValue = document.getElementById('trustScoreValue');
-  const scoreTier = document.getElementById('scoreTier');
-  const scoreAccess = document.getElementById('scoreAccess');
-  const scoreCircle = document.getElementById('scoreCircle');
+    // Get verification for trust score
+    const verifications = await API.getVerificationsByUserId(userId);
+    const latestVerification = verifications && verifications.length > 0 ? verifications[0] : null;
+    const trustScore = latestVerification?.trustScore || 0;
 
-  if (scoreValue) scoreValue.textContent = user.trustScore || 0;
-  if (scoreTier) scoreTier.textContent = TrustScore.getTier(user.trustScore || 0);
-  if (scoreAccess) {
-    const permissions = TrustScore.getAccessPermissions(user.trustScore || 0);
-    scoreAccess.textContent = permissions.dataAccess.charAt(0).toUpperCase() + permissions.dataAccess.slice(1) + ' Access';
-  }
-  if (scoreCircle) {
-    const score = user.trustScore || 0;
-    scoreCircle.style.background = `conic-gradient(#28a745 ${score * 3.6}deg, #333 ${score * 3.6}deg)`;
+    const scoreValue = document.getElementById('trustScoreValue');
+    const scoreTier = document.getElementById('scoreTier');
+    const scoreAccess = document.getElementById('scoreAccess');
+    const scoreCircle = document.getElementById('scoreCircle');
+
+    if (scoreValue) scoreValue.textContent = trustScore;
+    if (scoreTier) scoreTier.textContent = TrustScore.getTier(trustScore);
+    if (scoreAccess) {
+      const permissions = TrustScore.getAccessPermissions(trustScore);
+      scoreAccess.textContent = permissions.dataAccess.charAt(0).toUpperCase() + permissions.dataAccess.slice(1) + ' Access';
+    }
+    if (scoreCircle) {
+      scoreCircle.style.background = `conic-gradient(#28a745 ${trustScore * 3.6}deg, #333 ${trustScore * 3.6}deg)`;
+    }
+  } catch (error) {
+    console.error('Failed to update trust score display:', error);
   }
 }
 

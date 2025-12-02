@@ -1,5 +1,5 @@
 // Messaging System
-function sendMessageToAdmin(subject, message, userId) {
+async function sendMessageToAdmin(subject, message, userId) {
   if (!userId) {
     userId = localStorage.getItem('currentUserId');
   }
@@ -9,39 +9,49 @@ function sendMessageToAdmin(subject, message, userId) {
     return false;
   }
 
-  const messageData = {
-    userId,
-    toUserId: null, // null = admin
-    subject,
-    message,
-    type: 'user_to_admin'
-  };
+  try {
+    const messageData = {
+      userId: parseInt(userId),
+      toUserId: null, // null = admin
+      subject,
+      message
+    };
 
-  Database.createMessage(messageData);
+    await API.createMessage(messageData);
 
-  // Create alert for admin
-  Database.createAlert({
-    type: 'new_message',
-    title: 'New Message from User',
-    message: `You have a new message: ${subject}`,
-    userId,
-    priority: 'medium'
-  });
+    // Create alert for admin
+    try {
+      await API.createAlert({
+        userId: parseInt(userId),
+        type: 'new_message',
+        title: 'New Message from User',
+        message: `You have a new message: ${subject}`,
+        priority: 'medium'
+      });
+    } catch (alertError) {
+      console.error('Failed to create alert:', alertError);
+    }
 
-  return true;
+    return true;
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    showAlert('Failed to send message. Please try again.', 'danger');
+    return false;
+  }
 }
 
 // Initialize message form on passport page
 document.addEventListener('DOMContentLoaded', function() {
   const messageForm = document.getElementById('messageForm');
   if (messageForm) {
-    messageForm.addEventListener('submit', function(e) {
+    messageForm.addEventListener('submit', async function(e) {
       e.preventDefault();
       const subject = document.getElementById('messageSubject').value;
       const message = document.getElementById('messageText').value;
       const userId = localStorage.getItem('currentUserId');
 
-      if (sendMessageToAdmin(subject, message, userId)) {
+      const success = await sendMessageToAdmin(subject, message, userId);
+      if (success) {
         showAlert('Message sent successfully.', 'success');
         messageForm.reset();
       }

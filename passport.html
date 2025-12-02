@@ -184,13 +184,14 @@
     ></script>
 
     <!-- Custom JS -->
-    <script src="./scripts/database.js"></script>
+    <script src="./scripts/apiConfig.js"></script>
+    <script src="./scripts/api.js"></script>
     <script src="./scripts/trustScore.js"></script>
     <script src="./scripts/messaging.js"></script>
     <script src="./scripts/main.js"></script>
     <script>
       // Load passport data
-      document.addEventListener('DOMContentLoaded', function () {
+      document.addEventListener('DOMContentLoaded', async function () {
         // Check for passport code in URL or localStorage
         const urlParams = new URLSearchParams(window.location.search);
         const passportCode = urlParams.get('code') || localStorage.getItem('currentPassportCode');
@@ -200,30 +201,36 @@
           return;
         }
 
-        // Find user by passport code
-        const users = Database.getUsers();
-        const user = users.find(u => u.passportCode === passportCode || u.passportId === passportCode);
-        
-        if (!user || !user.verified) {
+        try {
+          // Find passport by code via API
+          const passport = await API.getPassportByCode(passportCode);
+          
+          if (!passport || !passport.verified) {
+            showAlert('Invalid or unverified passport code.', 'danger');
+            setTimeout(() => {
+              window.location.href = 'index.html';
+            }, 2000);
+            return;
+          }
+
+          // Store for messaging
+          localStorage.setItem('currentUserId', passport.userId);
+          localStorage.setItem('currentPassportCode', passportCode);
+
+          // Populate passport
+          document.getElementById('passportName').textContent = passport.name || 'N/A';
+          document.getElementById('passportEmail').textContent = passport.email;
+          document.getElementById('passportOrg').textContent = passport.organization || 'N/A';
+          document.getElementById('passportTrustScore').textContent = passport.trustScore || 0;
+          document.getElementById('passportTier').textContent = TrustScore.getTier(passport.trustScore || 0);
+          document.getElementById('passportDate').textContent = new Date(passport.verifiedAt).toLocaleDateString();
+          document.getElementById('passportCode').textContent = passportCode;
+        } catch (error) {
           showAlert('Invalid or unverified passport code.', 'danger');
           setTimeout(() => {
             window.location.href = 'index.html';
           }, 2000);
-          return;
         }
-
-        // Store for messaging
-        localStorage.setItem('currentUserId', user.id);
-        localStorage.setItem('currentPassportCode', passportCode);
-
-        // Populate passport
-        document.getElementById('passportName').textContent = user.name;
-        document.getElementById('passportEmail').textContent = user.email;
-        document.getElementById('passportOrg').textContent = user.organization;
-        document.getElementById('passportTrustScore').textContent = user.trustScore || 0;
-        document.getElementById('passportTier').textContent = TrustScore.getTier(user.trustScore || 0);
-        document.getElementById('passportDate').textContent = new Date(user.verifiedAt).toLocaleDateString();
-        document.getElementById('passportCode').textContent = passportCode;
       });
 
       function downloadPassport() {

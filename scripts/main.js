@@ -28,7 +28,7 @@ function formatPassportCode(input) {
 }
 
 // Lookup passport by code
-function lookupPassport(event) {
+async function lookupPassport(event) {
   event.preventDefault();
   const code = document.getElementById('passportCodeInput').value.trim();
   
@@ -37,39 +37,45 @@ function lookupPassport(event) {
     return;
   }
 
-  // Find user by passport code
-  const users = Database.getUsers();
-  const user = users.find(u => u.passportCode === code || u.passportId === code);
-  
-  if (!user) {
+  try {
+    // Find passport by code via API
+    const passport = await API.getPassportByCode(code);
+    
+    if (!passport || !passport.verified) {
+      showAlert('This passport has not been verified yet. Please wait for admin approval.', 'warning');
+      return;
+    }
+
+    // Store code and redirect
+    localStorage.setItem('currentPassportCode', code);
+    localStorage.setItem('currentUserId', passport.userId);
+    window.location.href = `passport.html?code=${code}`;
+  } catch (error) {
     showAlert('Passport code not found. Please verify your code and try again.', 'danger');
-    return;
   }
-
-  if (!user.verified) {
-    showAlert('This passport has not been verified yet. Please wait for admin approval.', 'warning');
-    return;
-  }
-
-  // Store code and redirect
-  localStorage.setItem('currentPassportCode', code);
-  localStorage.setItem('currentUserId', user.id);
-  window.location.href = `passport.html?code=${code}`;
 }
 
 // Check for alerts on page load
-document.addEventListener('DOMContentLoaded', function() {
-  // Check for unread alerts
-  const alerts = Database.getUnreadAlerts();
-  alerts.forEach(alert => {
-    if (alert.priority === 'high') {
-      showAlert(alert.message, 'danger');
-    } else if (alert.priority === 'medium') {
-      showAlert(alert.message, 'warning');
-    } else {
-      showAlert(alert.message, 'info');
-    }
-    Database.markAlertRead(alert.id);
-  });
+document.addEventListener('DOMContentLoaded', async function() {
+  try {
+    // Check for unread alerts
+    const alerts = await API.getUnreadAlerts();
+    alerts.forEach(async (alert) => {
+      if (alert.priority === 'high') {
+        showAlert(alert.message, 'danger');
+      } else if (alert.priority === 'medium') {
+        showAlert(alert.message, 'warning');
+      } else {
+        showAlert(alert.message, 'info');
+      }
+      try {
+        await API.markAlertRead(alert.id);
+      } catch (e) {
+        console.error('Failed to mark alert as read:', e);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to load alerts:', error);
+  }
 });
 
