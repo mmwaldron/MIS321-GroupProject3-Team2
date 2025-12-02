@@ -35,7 +35,19 @@ namespace MIS321_GroupProject3_Team2.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { status = "error", message = ex.Message });
+                // Log the full exception for debugging
+                Console.WriteLine($"NVD Ingestion Error: {ex}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                }
+                
+                return StatusCode(500, new { 
+                    status = "error", 
+                    message = ex.Message,
+                    details = ex.InnerException?.Message
+                });
             }
         }
     }
@@ -64,11 +76,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
             try
             {
                 // Parse connection string if needed
-                var connString = _connectionString;
-                if (connString.StartsWith("mysql://"))
-                {
-                    connString = ParseJawsDbUrl(connString);
-                }
+                var connString = ParseConnectionString(_connectionString);
 
                 using var connection = new MySqlConnection(connString);
                 await connection.OpenAsync();

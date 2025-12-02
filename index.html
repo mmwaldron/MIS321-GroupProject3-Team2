@@ -41,6 +41,9 @@
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
             <li class="nav-item">
+              <a class="nav-link" href="dashboard.html">Dashboard</a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" href="index.html">Verification</a>
             </li>
             <li class="nav-item">
@@ -419,6 +422,16 @@
     <script src="./scripts/api.js"></script>
     <script src="./scripts/riskFilter.js"></script>
     <script src="./scripts/trustScore.js"></script>
+    <script>
+      // Redirect logged-in users to dashboard immediately (before other scripts load)
+      (function() {
+        const userId = localStorage.getItem('currentUserId');
+        if (userId) {
+          // User is logged in, redirect to dashboard immediately
+          window.location.replace('dashboard.html');
+        }
+      })();
+    </script>
     <script src="./scripts/verification.js"></script>
     <script src="./scripts/main.js"></script>
   </body>

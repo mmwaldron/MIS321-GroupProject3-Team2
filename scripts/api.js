@@ -12,8 +12,22 @@ const API = {
     };
 
     try {
+      // Check if we're using file:// protocol
+      if (window.location.protocol === 'file:') {
+        throw new Error('Cannot make API calls from file:// protocol. Please access this page through the web server (e.g., http://localhost:5000/dashboard.html)');
+      }
+
       const response = await fetch(url, config);
-      const data = await response.json();
+      
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      let data;
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+      }
       
       if (!response.ok) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
@@ -22,6 +36,12 @@ const API = {
       return data;
     } catch (error) {
       console.error('API request failed:', error);
+      
+      // Provide helpful error messages
+      if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+        throw new Error('Cannot connect to the API server. Make sure the backend server is running and accessible.');
+      }
+      
       throw error;
     }
   },
@@ -197,6 +217,13 @@ const API = {
   // Get user's passport code
   async getUserPassportCode(userId) {
     return await this.request(`/passport/user/${userId}`);
+  },
+
+  // NVD ingestion
+  async triggerNvdIngest() {
+    return await this.request('/nvd/ingest', {
+      method: 'POST'
+    });
   }
 };
 

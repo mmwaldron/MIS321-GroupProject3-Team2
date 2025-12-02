@@ -54,10 +54,10 @@ async function lookupPassport(event) {
       return;
     }
 
-    // Store code and redirect
+    // Store code and redirect to dashboard
     localStorage.setItem('currentPassportCode', code);
     localStorage.setItem('currentUserId', passport.userId);
-    window.location.href = `passport.html?code=${code}`;
+    window.location.href = 'dashboard.html';
   } catch (error) {
     showAlert('Passport code not found. Please verify your code and try again.', 'danger');
   }

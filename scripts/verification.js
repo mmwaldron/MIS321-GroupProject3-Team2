@@ -548,11 +548,11 @@ function displayPendingApprovalResult(userId, verificationId) {
     <p class="mt-2 mb-0"><strong>Once approved, you will receive your 10-digit passport code here.</strong></p>
   `;
   resultActions.innerHTML = `
-    <button class="btn btn-success" onclick="checkAccountStatus()">
-      Check Status
+    <button class="btn btn-success" onclick="window.location.href='dashboard.html'">
+      Go to Dashboard
     </button>
-    <button class="btn btn-outline-secondary ms-2" onclick="window.location.reload()">
-      Refresh Page
+    <button class="btn btn-outline-secondary ms-2" onclick="checkAccountStatus()">
+      Check Status
     </button>
   `;
 }
@@ -602,13 +602,17 @@ async function checkAccountStatus() {
         // Get passport code from passport endpoint
         try {
           // The passport code would be available after admin approval
-          showAlert('Your account has been approved! Please check your portal for your passport code.', 'success');
+          showAlert('Your account has been approved! Redirecting to dashboard...', 'success');
           localStorage.setItem('userStatus', 'approved');
-          window.location.reload();
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 1500);
         } catch (error) {
-          showAlert('Account approved! Your passport code will be available shortly.', 'success');
+          showAlert('Account approved! Redirecting to dashboard...', 'success');
           localStorage.setItem('userStatus', 'approved');
-          window.location.reload();
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 1500);
         }
       } else {
         showAlert('Your account is still pending approval.', 'info');
