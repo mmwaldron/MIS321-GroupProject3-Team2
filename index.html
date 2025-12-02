@@ -53,6 +53,38 @@
 
     <!-- Main Container -->
     <div class="container my-5">
+      <!-- User Status Banner (if logged in) -->
+      <div class="row justify-content-center mb-4" id="userStatusBanner" style="display: none;">
+        <div class="col-lg-8">
+          <div class="card border-warning" id="pendingStatusCard">
+            <div class="card-body p-4">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-hourglass-split text-warning me-3" style="font-size: 2rem;"></i>
+                <div class="flex-grow-1">
+                  <h5 class="mb-1 text-warning">Account Pending Approval</h5>
+                  <p class="text-muted mb-0">Your account is pending admin approval. You are logged in, but access is restricted until approved.</p>
+                </div>
+                <button class="btn btn-outline-warning" onclick="checkAccountStatus()">Check Status</button>
+              </div>
+            </div>
+          </div>
+          <div class="card border-success" id="approvedStatusCard" style="display: none;">
+            <div class="card-body p-4">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-check-circle text-success me-3" style="font-size: 2rem;"></i>
+                <div class="flex-grow-1">
+                  <h5 class="mb-1 text-success">Account Approved</h5>
+                  <p class="text-muted mb-2">Your account has been approved! Your passport code is:</p>
+                  <div class="mt-2">
+                    <code id="passportCodeDisplay" class="bg-dark text-success p-2 rounded" style="font-size: 1.25rem; font-family: 'Courier New', monospace; display: none;"></code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Passport Code Lookup -->
       <div class="row justify-content-center mb-4">
         <div class="col-lg-8">
@@ -182,18 +214,90 @@
                       <small class="text-muted">Upload ID or verification document</small>
                     </div>
                     <div class="mb-3">
-                      <label class="form-label">Professional License (Optional)</label>
+                      <label class="form-label">Company Email Address</label>
                       <input
-                        type="text"
+                        type="email"
                         class="form-control bg-dark text-light border-success"
-                        id="license"
+                        id="companyEmail"
+                        placeholder="your.email@company.com"
+                        required
                       />
+                      <small class="text-muted">We'll send a verification code to this email</small>
                     </div>
                     <div class="d-flex gap-2">
                       <button type="button" class="btn btn-outline-secondary" onclick="goToStep(1)">
                         Back
                       </button>
                       <button type="submit" class="btn btn-success flex-grow-1">
+                        Send Verification Code <i class="bi bi-arrow-right"></i>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Step 2.5: Email Verification Code -->
+                <div class="step" id="step2_5" style="display: none">
+                  <h5 class="step-title">
+                    <span class="step-number">2.5</span>
+                    Email Verification
+                  </h5>
+                  <div class="mb-4 text-center">
+                    <i class="bi bi-envelope-check text-success" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">We've sent a verification code to <strong id="emailDisplay"></strong></p>
+                  </div>
+                  <form id="emailVerificationForm">
+                    <div class="mb-3">
+                      <label class="form-label">Verification Code</label>
+                      <input
+                        type="text"
+                        class="form-control bg-dark text-light border-success text-center"
+                        id="emailVerificationCode"
+                        maxlength="8"
+                        placeholder="Enter code"
+                        style="font-size: 1.25rem; letter-spacing: 0.25rem; font-family: 'Courier New', monospace;"
+                        required
+                      />
+                      <small class="text-muted d-block mt-2 text-center">Code expires in 10 minutes</small>
+                    </div>
+                    <div class="mb-3">
+                      <button
+                        type="button"
+                        class="btn btn-link text-success p-0"
+                        id="resendEmailCode"
+                      >
+                        Resend Code
+                      </button>
+                    </div>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2)">
+                        Back
+                      </button>
+                      <button type="submit" class="btn btn-success flex-grow-1">
+                        Verify Email <i class="bi bi-shield-check"></i>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Step 2.75: CAPTCHA Verification -->
+                <div class="step" id="step2_75" style="display: none">
+                  <h5 class="step-title">
+                    <span class="step-number">2.75</span>
+                    Security Verification
+                  </h5>
+                  <div class="mb-4 text-center">
+                    <i class="bi bi-shield-lock text-success" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">Please complete the security verification below</p>
+                  </div>
+                  <form id="captchaForm">
+                    <div class="mb-4 d-flex justify-content-center">
+                      <div id="captchaContainer"></div>
+                    </div>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2.5)">
+                        Back
+                      </button>
+                      <button type="submit" class="btn btn-success flex-grow-1" id="captchaSubmitBtn" disabled>
                         Continue <i class="bi bi-arrow-right"></i>
                       </button>
                     </div>
@@ -299,6 +403,9 @@
 
     <!-- Alert Notifications -->
     <div class="alert-container" id="alertContainer"></div>
+
+    <!-- Google reCAPTCHA v2 -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
     <!-- Bootstrap JS bundle -->
     <script

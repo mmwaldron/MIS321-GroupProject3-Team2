@@ -161,6 +161,42 @@ const API = {
   // Top alerts (NVD)
   async getTopAlerts() {
     return await this.request('/alerts/top');
+  },
+
+  // Company email verification
+  async sendCompanyEmailVerification(email) {
+    return await this.request('/verifications/email/send', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  },
+
+  async verifyCompanyEmailCode(email, code) {
+    return await this.request('/verifications/email/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code })
+    });
+  },
+
+  // CAPTCHA verification
+  async verifyCaptcha(token) {
+    return await this.request('/verifications/captcha/verify', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    });
+  },
+
+  // Register pending user (from verification form)
+  async registerPendingUser(userData) {
+    return await this.request('/verifications/register-pending', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  // Get user's passport code
+  async getUserPassportCode(userId) {
+    return await this.request(`/passport/user/${userId}`);
   }
 };
 

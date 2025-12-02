@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using MySqlConnector;
 using System.Text.Json;
+using System.Net.Mail;
+using System.Net;
 
 namespace MIS321_GroupProject3_Team2.Controllers
 {
@@ -9,6 +11,9 @@ namespace MIS321_GroupProject3_Team2.Controllers
     public class VerificationController : ControllerBase
     {
         private readonly string _connectionString;
+        private static readonly Dictionary<string, EmailVerificationCode> _emailVerificationCodes = new();
+        private static readonly object _codeLock = new();
+        private static DateTime _lastCleanup = DateTime.UtcNow;
 
         public VerificationController(IConfiguration configuration)
         {
@@ -20,6 +25,119 @@ namespace MIS321_GroupProject3_Team2.Controllers
             _connectionString = configConn 
                 ?? Environment.GetEnvironmentVariable("JAWSDB_URL") 
                 ?? "mysql://rafzxyujgowd9c4f:u40pss81sz1ub6t8@durvbryvdw2sjcm5.cbetxkdyhwsb.us-east-1.rds.amazonaws.com:3306/p14kvqervonda4dv";
+        }
+
+        [HttpPost("register-pending")]
+        public async Task<IActionResult> RegisterPendingUser([FromBody] RegisterPendingUserRequest request)
+        {
+            try
+            {
+                var connString = ParseConnectionString(_connectionString);
+
+                using var connection = new MySqlConnection(connString);
+                await connection.OpenAsync();
+
+                // Check if email already exists
+                using var checkCmd = new MySqlCommand(
+                    "SELECT id FROM users WHERE email = @email",
+                    connection);
+                checkCmd.Parameters.AddWithValue("@email", request.Email);
+                
+                using var checkReader = await checkCmd.ExecuteReaderAsync();
+                int userId;
+                if (checkReader.Read())
+                {
+                    userId = checkReader.GetInt32("id");
+                    checkReader.Close();
+                }
+                else
+                {
+                    checkReader.Close();
+                    
+                    // Create new user with pending status
+                    // Generate a temporary password hash (user will need to set password later)
+                    var tempPassword = System.Guid.NewGuid().ToString();
+                    var passwordHash = HashPassword(tempPassword);
+                    
+                    // Generate MFA secret
+                    var mfaSecret = GenerateMFASecret();
+                    
+                    using var insertUserCmd = new MySqlCommand(
+                        "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review)",
+                        connection);
+                    insertUserCmd.Parameters.AddWithValue("@email", request.Email);
+                    insertUserCmd.Parameters.AddWithValue("@password_hash", passwordHash);
+                    insertUserCmd.Parameters.AddWithValue("@mfa_secret", mfaSecret);
+                    insertUserCmd.Parameters.AddWithValue("@is_verified", false);
+                    insertUserCmd.Parameters.AddWithValue("@requires_review", false);
+                    
+                    await insertUserCmd.ExecuteNonQueryAsync();
+                    userId = (int)insertUserCmd.LastInsertedId;
+                }
+
+                // Store verification data as JSON in reason field
+                var verificationData = JsonSerializer.Serialize(new
+                {
+                    name = request.Name,
+                    email = request.Email,
+                    phone = request.Phone,
+                    organization = request.Organization,
+                    govId = request.GovId,
+                    hasDocument = request.HasDocument,
+                    companyEmail = request.CompanyEmail,
+                    riskScore = request.RiskScore,
+                    riskLevel = request.RiskLevel,
+                    urgency = request.Urgency,
+                    credibility = request.Credibility,
+                    trustScore = request.TrustScore,
+                    factors = request.Factors
+                });
+
+                // Check if verification already exists for this user
+                using var checkVerificationCmd = new MySqlCommand(
+                    "SELECT id FROM pending_verifications WHERE user_id = @user_id AND status = 'pending'",
+                    connection);
+                checkVerificationCmd.Parameters.AddWithValue("@user_id", userId);
+                
+                var existingVerificationId = await checkVerificationCmd.ExecuteScalarAsync();
+                int verificationId;
+                
+                if (existingVerificationId != null)
+                {
+                    verificationId = Convert.ToInt32(existingVerificationId);
+                    // Update existing verification
+                    using var updateCmd = new MySqlCommand(
+                        "UPDATE pending_verifications SET reason = @reason WHERE id = @id",
+                        connection);
+                    updateCmd.Parameters.AddWithValue("@reason", verificationData);
+                    updateCmd.Parameters.AddWithValue("@id", verificationId);
+                    await updateCmd.ExecuteNonQueryAsync();
+                }
+                else
+                {
+                    // Create new verification record
+                    using var insertVerificationCmd = new MySqlCommand(
+                        "INSERT INTO pending_verifications (user_id, reason, status) VALUES (@user_id, @reason, 'pending')",
+                        connection);
+                    insertVerificationCmd.Parameters.AddWithValue("@user_id", userId);
+                    insertVerificationCmd.Parameters.AddWithValue("@reason", verificationData);
+                    
+                    await insertVerificationCmd.ExecuteNonQueryAsync();
+                    verificationId = (int)insertVerificationCmd.LastInsertedId;
+                }
+
+                return Ok(new { 
+                    success = true,
+                    userId = userId,
+                    verificationId = verificationId,
+                    status = "pending",
+                    message = "Your account has been created and is pending admin approval."
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
         }
 
         [HttpPost]
@@ -41,7 +159,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     organization = request.Organization,
                     govId = request.GovId,
                     hasDocument = request.HasDocument,
-                    license = request.License,
+                    companyEmail = request.CompanyEmail,
                     riskScore = request.RiskScore,
                     riskLevel = request.RiskLevel,
                     urgency = request.Urgency,
@@ -336,10 +454,15 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 var passportCode = GeneratePassportCode();
                 var passportHash = HashPassportCode(passportCode);
 
-                // Update verification status
+                // Update verification status and store passport code in reason field
+                var reasonData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
+                reasonData["passportCode"] = JsonSerializer.SerializeToElement(passportCode);
+                var updatedReason = JsonSerializer.Serialize(reasonData);
+
                 using var updateVerificationCmd = new MySqlCommand(
-                    "UPDATE pending_verifications SET status = 'approved', reviewed_at = NOW() WHERE id = @id",
+                    "UPDATE pending_verifications SET status = 'approved', reason = @reason, reviewed_at = NOW() WHERE id = @id",
                     connection);
+                updateVerificationCmd.Parameters.AddWithValue("@reason", updatedReason);
                 updateVerificationCmd.Parameters.AddWithValue("@id", id);
                 await updateVerificationCmd.ExecuteNonQueryAsync();
 
@@ -354,9 +477,9 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 // Add admin notes if provided
                 if (!string.IsNullOrEmpty(request.AdminNotes))
                 {
-                    var reasonData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
+                    // Use the existing reasonData and add admin notes
                     reasonData["adminNotes"] = JsonSerializer.SerializeToElement(request.AdminNotes);
-                    var updatedReason = JsonSerializer.Serialize(reasonData);
+                    updatedReason = JsonSerializer.Serialize(reasonData);
                     
                     using var updateNotesCmd = new MySqlCommand(
                         "UPDATE pending_verifications SET reason = @reason WHERE id = @id",
@@ -446,6 +569,236 @@ namespace MIS321_GroupProject3_Team2.Controllers
             return Convert.ToBase64String(hash);
         }
 
+        [HttpPost("email/send")]
+        public async Task<IActionResult> SendCompanyEmailVerification([FromBody] SendEmailVerificationRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.Email) || !IsValidEmail(request.Email))
+                {
+                    return BadRequest(new { success = false, message = "Invalid email address" });
+                }
+
+                // Generate verification code (6-8 alphanumeric characters)
+                var code = GenerateVerificationCode();
+                var verificationId = Guid.NewGuid().ToString();
+
+                // Store code with expiry (10 minutes)
+                lock (_codeLock)
+                {
+                    // Cleanup expired codes periodically
+                    CleanupExpiredCodes();
+                    
+                    _emailVerificationCodes[verificationId] = new EmailVerificationCode
+                    {
+                        Email = request.Email.ToLower(),
+                        Code = code,
+                        ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+                        VerificationId = verificationId
+                    };
+                }
+
+                // Send email
+                var emailSent = await SendVerificationEmail(request.Email, code);
+                
+                if (!emailSent)
+                {
+                    lock (_codeLock)
+                    {
+                        _emailVerificationCodes.Remove(verificationId);
+                    }
+                    return StatusCode(500, new { success = false, message = "Failed to send verification email. Please check your email address and try again." });
+                }
+
+                return Ok(new { success = true, verificationId = verificationId, message = "Verification code sent successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("email/verify")]
+        public IActionResult VerifyCompanyEmailCode([FromBody] VerifyEmailCodeRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Code))
+                {
+                    return BadRequest(new { success = false, message = "Email and code are required" });
+                }
+
+                lock (_codeLock)
+                {
+                    // Find matching verification code
+                    var verification = _emailVerificationCodes.Values
+                        .FirstOrDefault(v => v.Email == request.Email.ToLower() && 
+                                            v.Code == request.Code.ToUpper() && 
+                                            v.ExpiresAt > DateTime.UtcNow);
+
+                    if (verification == null)
+                    {
+                        return BadRequest(new { success = false, message = "Invalid or expired verification code" });
+                    }
+
+                    // Remove used code
+                    _emailVerificationCodes.Remove(verification.VerificationId);
+
+                    return Ok(new { success = true, message = "Email verified successfully" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("captcha/verify")]
+        public async Task<IActionResult> VerifyCaptcha([FromBody] VerifyCaptchaRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.Token))
+                {
+                    return BadRequest(new { success = false, message = "CAPTCHA token is required" });
+                }
+
+                // Get reCAPTCHA secret key from environment or configuration
+                var secretKey = Environment.GetEnvironmentVariable("RECAPTCHA_SECRET_KEY") 
+                    ?? "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"; // Test secret key - replace with your actual key
+
+                // Verify with Google reCAPTCHA API
+                using var httpClient = new HttpClient();
+                var response = await httpClient.PostAsync(
+                    $"https://www.google.com/recaptcha/api/siteverify?secret={secretKey}&response={request.Token}",
+                    null);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+
+                if (result.TryGetProperty("success", out var successElement) && successElement.GetBoolean())
+                {
+                    return Ok(new { success = true, message = "CAPTCHA verified successfully" });
+                }
+                else
+                {
+                    return BadRequest(new { success = false, message = "CAPTCHA verification failed" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        private static string GenerateVerificationCode()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            var length = random.Next(6, 9); // 6-8 characters
+            return new string(Enumerable.Repeat(chars, length)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
+        private static async Task<bool> SendVerificationEmail(string email, string code)
+        {
+            try
+            {
+                // Get SMTP settings from environment variables
+                var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? "smtp.gmail.com";
+                var smtpPort = int.Parse(Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587");
+                var smtpUsername = Environment.GetEnvironmentVariable("SMTP_USERNAME") ?? "";
+                var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD") ?? "";
+                var smtpFromEmail = Environment.GetEnvironmentVariable("SMTP_FROM_EMAIL") ?? smtpUsername;
+                var smtpFromName = Environment.GetEnvironmentVariable("SMTP_FROM_NAME") ?? "Bio-Isac Verification";
+
+                // If no SMTP credentials are configured, log and return false
+                if (string.IsNullOrEmpty(smtpUsername) || string.IsNullOrEmpty(smtpPassword))
+                {
+                    Console.WriteLine($"SMTP not configured. Would send code {code} to {email}");
+                    // For development/testing, you might want to return true here
+                    // In production, you should always return false if SMTP is not configured
+                    return false;
+                }
+
+                using var mailMessage = new MailMessage();
+                mailMessage.From = new MailAddress(smtpFromEmail, smtpFromName);
+                mailMessage.To.Add(email);
+                mailMessage.Subject = "Bio-Isac Email Verification Code";
+                mailMessage.Body = $@"
+Hello,
+
+Your email verification code is: {code}
+
+This code will expire in 10 minutes.
+
+If you did not request this code, please ignore this email.
+
+Best regards,
+Bio-Isac Team
+";
+                mailMessage.IsBodyHtml = false;
+
+                using var smtpClient = new SmtpClient(smtpHost, smtpPort);
+                smtpClient.EnableSsl = true;
+                smtpClient.Credentials = new NetworkCredential(smtpUsername, smtpPassword);
+
+                await smtpClient.SendMailAsync(mailMessage);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error sending email: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool IsValidEmail(string email)
+        {
+            try
+            {
+                var addr = new System.Net.Mail.MailAddress(email);
+                return addr.Address == email;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void CleanupExpiredCodes()
+        {
+            // Cleanup every 5 minutes
+            if ((DateTime.UtcNow - _lastCleanup).TotalMinutes < 5)
+                return;
+
+            var expiredKeys = _emailVerificationCodes
+                .Where(kvp => kvp.Value.ExpiresAt < DateTime.UtcNow)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var key in expiredKeys)
+            {
+                _emailVerificationCodes.Remove(key);
+            }
+
+            _lastCleanup = DateTime.UtcNow;
+        }
+
+        private static string HashPassword(string password)
+        {
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(password);
+            var hash = sha256.ComputeHash(bytes);
+            return Convert.ToBase64String(hash);
+        }
+
+        private static string GenerateMFASecret()
+        {
+            var random = new Random();
+            return random.Next(1000, 9999).ToString();
+        }
+
         private static string ParseConnectionString(string connectionString)
         {
             if (connectionString.StartsWith("mysql://"))
@@ -456,6 +809,14 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 return $"Server={uri.Host};Database={database};User={userInfo[0]};Password={userInfo[1]};Port={uri.Port};";
             }
             return connectionString;
+        }
+
+        private class EmailVerificationCode
+        {
+            public string Email { get; set; } = "";
+            public string Code { get; set; } = "";
+            public DateTime ExpiresAt { get; set; }
+            public string VerificationId { get; set; } = "";
         }
     }
 
@@ -468,7 +829,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
         public string Organization { get; set; } = "";
         public string? GovId { get; set; }
         public bool HasDocument { get; set; }
-        public string? License { get; set; }
+        public string? CompanyEmail { get; set; }
         public double RiskScore { get; set; }
         public string RiskLevel { get; set; } = "low";
         public double Urgency { get; set; }
@@ -492,6 +853,39 @@ namespace MIS321_GroupProject3_Team2.Controllers
     public class DenyVerificationRequest
     {
         public string? AdminNotes { get; set; }
+    }
+
+    public class SendEmailVerificationRequest
+    {
+        public string Email { get; set; } = "";
+    }
+
+    public class VerifyEmailCodeRequest
+    {
+        public string Email { get; set; } = "";
+        public string Code { get; set; } = "";
+    }
+
+    public class VerifyCaptchaRequest
+    {
+        public string Token { get; set; } = "";
+    }
+
+    public class RegisterPendingUserRequest
+    {
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public string Organization { get; set; } = "";
+        public string? GovId { get; set; }
+        public bool HasDocument { get; set; }
+        public string? CompanyEmail { get; set; }
+        public double RiskScore { get; set; }
+        public string RiskLevel { get; set; } = "low";
+        public double Urgency { get; set; }
+        public double Credibility { get; set; }
+        public double TrustScore { get; set; }
+        public object? Factors { get; set; }
     }
 }
 
