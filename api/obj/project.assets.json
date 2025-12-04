@@ -168,15 +168,9 @@
     }
   },
   "projectFileDependencyGroups": {
-<<<<<<< HEAD
     "net8.0": [
-      "MySqlConnector >= 2.3.7"
-=======
-    "net9.0": [
-      "Microsoft.AspNetCore.OpenApi >= 9.0.1",
       "MySqlConnector >= 2.3.7",
       "QRCoder >= 1.6.0"
->>>>>>> 91517766b5bbbd52a76349a4368aef68139592e1
     ]
   },
   "packageFolders": {

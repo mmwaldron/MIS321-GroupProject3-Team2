@@ -1,10 +1,3 @@
-C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.csproj.AssemblyReference.cache
-C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.AssemblyInfoInputs.cache
-C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.AssemblyInfo.cs
-C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.csproj.CoreCompileInputs.cache
-C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.MvcApplicationPartsAssemblyInfo.cache
-C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.sourcelink.json
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\appsettings.Development.json
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\appsettings.json
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\MIS321-GroupProject3-Team2.exe
@@ -13,6 +6,14 @@ C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\MIS321-
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\MIS321-GroupProject3-Team2.dll
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\MIS321-GroupProject3-Team2.pdb
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\MySqlConnector.dll
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\bin\Debug\net8.0\QRCoder.dll
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.csproj.AssemblyReference.cache
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.AssemblyInfoInputs.cache
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.AssemblyInfo.cs
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.csproj.CoreCompileInputs.cache
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\MIS321-GroupProject3-Team2.sourcelink.json
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\staticwebassets.build.json
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\staticwebassets.development.json
 C:\Users\tasta\Downloads\MIS321-GroupProject3-Team2\api\obj\Debug\net8.0\staticwebassets\msbuild.MIS321-GroupProject3-Team2.Microsoft.AspNetCore.StaticWebAssets.props
