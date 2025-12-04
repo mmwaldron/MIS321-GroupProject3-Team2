@@ -233,6 +233,22 @@ const API = {
     return await this.request(`/passport/user/${userId}`);
   },
 
+  // Verify QR code (from uploaded QR image)
+  async verifyQRCode(code) {
+    return await this.request('/passport/verify-qr-code', {
+      method: 'POST',
+      body: JSON.stringify({ code })
+    });
+  },
+
+  // Admin login
+  async adminLogin(email) {
+    return await this.request('/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  },
+
   // NVD ingestion
   async triggerNvdIngest() {
     return await this.request('/nvd/ingest', {

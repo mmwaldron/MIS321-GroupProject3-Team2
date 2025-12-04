@@ -6,11 +6,12 @@
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),                  -- NULL for admin users using passport login
     mfa_secret VARCHAR(255),                    -- for OTP codes
     is_verified BOOLEAN DEFAULT FALSE,          -- passed verification
     requires_review BOOLEAN DEFAULT FALSE,      -- flagged → Whitney review
     passport_hash VARCHAR(255),                 -- unique hashed ID for QR
+    classification ENUM('user', 'admin') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

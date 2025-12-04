@@ -114,6 +114,88 @@ namespace MIS321_GroupProject3_Team2.Controllers
             return Convert.ToBase64String(hash);
         }
 
+        [HttpPost("verify-qr-code")]
+        public async Task<IActionResult> VerifyQRCode([FromBody] VerifyQRCodeRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.Code))
+                {
+                    return BadRequest(new { message = "Passport code is required" });
+                }
+
+                // Verify passport code
+                var connString = ParseConnectionString(_connectionString);
+                using var connection = new MySqlConnection(connString);
+                await connection.OpenAsync();
+
+                var codeHash = HashPassportCode(request.Code);
+
+                using var userCmd = new MySqlCommand(
+                    "SELECT id, email, is_verified FROM users WHERE passport_hash = @passport_hash",
+                    connection);
+                userCmd.Parameters.AddWithValue("@passport_hash", codeHash);
+
+                using var userReader = await userCmd.ExecuteReaderAsync();
+                if (!userReader.Read())
+                {
+                    return NotFound(new { message = "Invalid passport code" });
+                }
+
+                var idOrd = userReader.GetOrdinal("id");
+                var emailOrd = userReader.GetOrdinal("email");
+                var verifiedOrd = userReader.GetOrdinal("is_verified");
+
+                var userId = userReader.GetInt32(idOrd);
+                var email = userReader.GetString(emailOrd);
+                var isVerified = userReader.GetBoolean(verifiedOrd);
+                userReader.Close();
+
+                if (!isVerified)
+                {
+                    return BadRequest(new { message = "Passport not verified" });
+                }
+
+                // Get verification details
+                using var verificationCmd = new MySqlCommand(
+                    "SELECT reason FROM pending_verifications WHERE user_id = @user_id AND status = 'approved' ORDER BY reviewed_at DESC LIMIT 1",
+                    connection);
+                verificationCmd.Parameters.AddWithValue("@user_id", userId);
+
+                var reasonJson = "";
+                using var verReader = await verificationCmd.ExecuteReaderAsync();
+                if (verReader.Read())
+                {
+                    var reasonOrd = verReader.GetOrdinal("reason");
+                    reasonJson = verReader.IsDBNull(reasonOrd) ? "{}" : verReader.GetString(reasonOrd);
+                }
+                verReader.Close();
+
+                var verificationData = new Dictionary<string, JsonElement>();
+                if (!string.IsNullOrEmpty(reasonJson))
+                {
+                    verificationData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
+                }
+
+                var passport = new
+                {
+                    userId = userId,
+                    code = request.Code,
+                    email = email,
+                    name = verificationData.ContainsKey("name") ? verificationData["name"].GetString() : null,
+                    organization = verificationData.ContainsKey("organization") ? verificationData["organization"].GetString() : null,
+                    trustScore = verificationData.ContainsKey("trustScore") ? verificationData["trustScore"].GetDouble() : 0.0,
+                    verified = isVerified
+                };
+
+                return Ok(passport);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetUserPassportCode(int userId)
         {
@@ -162,17 +244,9 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 }
                 verReader.Close();
 
-                // Try to extract passport code from verification data
-                var verificationData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
-                if (verificationData.ContainsKey("passportCode"))
-                {
-                    var passportCode = verificationData["passportCode"].GetString();
-                    return Ok(new { code = passportCode });
-                }
-
-                // If not stored, we can't retrieve it (security: codes are hashed)
-                // In production, you'd want to store the code when generating it
-                return BadRequest(new { message = "Passport code not available. Please contact admin." });
+                // Passport code is not stored in database for security
+                // User must use the QR code file provided by admin
+                return BadRequest(new { message = "Passport code not available. Please use the QR code file provided by admin." });
             }
             catch (Exception ex)
             {
@@ -191,6 +265,11 @@ namespace MIS321_GroupProject3_Team2.Controllers
             }
             return connectionString;
         }
+    }
+
+    public class VerifyQRCodeRequest
+    {
+        public string Code { get; set; } = "";
     }
 }
 

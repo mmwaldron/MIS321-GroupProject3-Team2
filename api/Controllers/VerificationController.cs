@@ -3,6 +3,7 @@ using MySqlConnector;
 using System.Text.Json;
 using System.Net.Mail;
 using System.Net;
+using QRCoder;
 
 namespace MIS321_GroupProject3_Team2.Controllers
 {
@@ -73,7 +74,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     var mfaSecret = GenerateMFASecret();
                     
                     using var insertUserCmd = new MySqlCommand(
-                        "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review)",
+                        "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review, classification) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review, 'user')",
                         connection);
                     insertUserCmd.Parameters.AddWithValue("@email", request.Email);
                     insertUserCmd.Parameters.AddWithValue("@password_hash", passwordHash);
@@ -464,9 +465,12 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 var passportCode = GeneratePassportCode();
                 var passportHash = HashPassportCode(passportCode);
 
-                // Update verification status and store passport code in reason field
+                // Generate QR code as base64 (NOT stored in database)
+                var qrCodeBase64 = GenerateQRCodeBase64(passportCode);
+
+                // Update verification status - DO NOT store passport code in reason field
                 var reasonData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
-                reasonData["passportCode"] = JsonSerializer.SerializeToElement(passportCode);
+                // Removed: reasonData["passportCode"] = JsonSerializer.SerializeToElement(passportCode);
                 var updatedReason = JsonSerializer.Serialize(reasonData);
 
                 using var updateVerificationCmd = new MySqlCommand(
@@ -502,7 +506,8 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 return Ok(new { 
                     message = "Verification approved",
                     passportCode = passportCode,
-                    passportHash = passportHash
+                    passportHash = passportHash,
+                    qrCodeBase64 = qrCodeBase64
                 });
             }
             catch (Exception ex)
@@ -577,6 +582,15 @@ namespace MIS321_GroupProject3_Team2.Controllers
             var bytes = System.Text.Encoding.UTF8.GetBytes(code);
             var hash = sha256.ComputeHash(bytes);
             return Convert.ToBase64String(hash);
+        }
+
+        private static string GenerateQRCodeBase64(string code)
+        {
+            using var qrGenerator = new QRCodeGenerator();
+            var qrCodeData = qrGenerator.CreateQrCode(code, QRCodeGenerator.ECCLevel.Q);
+            using var qrCode = new PngByteQRCode(qrCodeData);
+            var qrCodeBytes = qrCode.GetGraphic(20);
+            return Convert.ToBase64String(qrCodeBytes);
         }
 
         [HttpPost("email/send")]
