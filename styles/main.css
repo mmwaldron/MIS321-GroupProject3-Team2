@@ -726,6 +726,67 @@ body::before {
   box-shadow: 0 0 10px var(--glow-green);
 }
 
+/* Pending Approval Modal Overlay */
+.pending-approval-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+  pointer-events: none; /* Allow clicks to pass through overlay */
+}
+
+.pending-approval-modal-content {
+  width: 100%;
+  max-width: 600px;
+  animation: slideUp 0.4s ease;
+  pointer-events: auto; /* Re-enable pointer events for the modal itself */
+}
+
+.pending-approval-modal-content .card {
+  border-width: 3px;
+  box-shadow: 0 10px 40px rgba(255, 193, 7, 0.3), 0 0 30px rgba(255, 193, 7, 0.2);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .logo-text {
@@ -771,6 +832,31 @@ body::before {
     font-size: 1rem;
     padding: 1rem 1.25rem;
     min-height: 55px;
+  }
+
+  .pending-approval-modal-content {
+    max-width: 95%;
+  }
+
+  .pending-approval-modal-content .card-body {
+    padding: 2rem 1.5rem !important;
+  }
+
+  .pending-approval-modal-content .card-body i {
+    font-size: 3.5rem !important;
+  }
+
+  .pending-approval-modal-content .card-body h2 {
+    font-size: 1.5rem !important;
+  }
+
+  .pending-approval-modal-content .card-body p {
+    font-size: 1rem !important;
+  }
+
+  .pending-approval-modal-content .btn {
+    font-size: 0.9rem;
+    padding: 0.75rem 1.5rem;
   }
 
   .mfa-code-display {

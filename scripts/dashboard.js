@@ -8,23 +8,197 @@ document.addEventListener('DOMContentLoaded', async function() {
     return;
   }
 
-  // Load alerts on page load
-  await loadAlerts();
+  // Check if user is approved before showing dashboard
+  try {
+    const user = await API.getUser(userId);
+    
+    // Check if user is verified/approved
+    if (!user.verified) {
+      // User is pending - hide dashboard and show pending message
+      showPendingApprovalMessage();
+      return;
+    }
 
-  // Set up tab switching to load profile when profile tab is clicked
-  const profileTab = document.getElementById('profile-tab');
-  if (profileTab) {
-    profileTab.addEventListener('shown.bs.tab', function() {
+    // Check verification status as well
+    try {
+      const verifications = await API.getVerificationsByUserId(userId);
+      const latestVerification = verifications && verifications.length > 0 ? verifications[0] : null;
+      
+      if (latestVerification && latestVerification.status !== 'approved') {
+        // Verification is not approved - show pending message
+        showPendingApprovalMessage();
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking verification status:', error);
+      // If we can't check verification, still allow if user.verified is true
+    }
+
+    // User is approved - show dashboard
+    showDashboardContent();
+    
+    // Load alerts on page load
+    await loadAlerts();
+
+    // Set up tab switching to load profile when profile tab is clicked
+    const profileTab = document.getElementById('profile-tab');
+    if (profileTab) {
+      profileTab.addEventListener('shown.bs.tab', function() {
+        loadProfile();
+      });
+    }
+
+    // Load profile if already on profile tab (e.g., direct navigation)
+    const activeTab = document.querySelector('#dashboardTabs .nav-link.active');
+    if (activeTab && activeTab.id === 'profile-tab') {
       loadProfile();
-    });
-  }
-
-  // Load profile if already on profile tab (e.g., direct navigation)
-  const activeTab = document.querySelector('#dashboardTabs .nav-link.active');
-  if (activeTab && activeTab.id === 'profile-tab') {
-    loadProfile();
+    }
+  } catch (error) {
+    console.error('Error checking user status:', error);
+    showAlert('Failed to verify your account status. Please try again.', 'danger');
+    // Hide dashboard content on error
+    showPendingApprovalMessage();
   }
 });
+
+function showPendingApprovalMessage() {
+  // Check if user has dismissed the message
+  const dismissedKey = 'pendingMessageDismissed_' + localStorage.getItem('currentUserId');
+  if (localStorage.getItem(dismissedKey) === 'true') {
+    // User has dismissed it, don't show again
+    return;
+  }
+
+  // Hide all dashboard content
+  const dashboardTabs = document.getElementById('dashboardTabs');
+  const dashboardTabContent = document.getElementById('dashboardTabContent');
+  
+  if (dashboardTabs) dashboardTabs.style.display = 'none';
+  if (dashboardTabContent) dashboardTabContent.style.display = 'none';
+
+  // Create or show pending approval modal overlay
+  let pendingModal = document.getElementById('pendingApprovalModal');
+  if (!pendingModal) {
+    pendingModal = document.createElement('div');
+    pendingModal.id = 'pendingApprovalModal';
+    pendingModal.className = 'pending-approval-overlay';
+    document.body.appendChild(pendingModal);
+  }
+
+  pendingModal.innerHTML = `
+    <div class="pending-approval-modal-content">
+      <div class="card border-warning bg-dark shadow-lg">
+        <div class="card-body p-5 text-center">
+          <i class="bi bi-hourglass-split text-warning mb-3" style="font-size: 5rem; animation: pulse 2s ease-in-out infinite;"></i>
+          <h2 class="text-warning mb-4 fw-bold">Account Pending Approval</h2>
+          <p class="text-light mb-4" style="font-size: 1.15rem; line-height: 1.6;">
+            Your account registration has been received and is pending admin approval.
+            <br><br>
+            You will be able to access the dashboard once an administrator has reviewed and approved your account.
+          </p>
+          <div class="d-flex justify-content-center gap-3 mt-4">
+            <button class="btn btn-warning btn-lg px-4" onclick="checkDashboardStatus()">
+              <i class="bi bi-arrow-clockwise"></i> Check Status
+            </button>
+            <button class="btn btn-outline-light btn-lg px-4" onclick="dismissPendingMessage()">
+              <i class="bi bi-house"></i> Return Home
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  pendingModal.style.display = 'flex';
+}
+
+// Function to dismiss the pending message and navigate home
+function dismissPendingMessage() {
+  const userId = localStorage.getItem('currentUserId');
+  if (userId) {
+    // Mark message as dismissed for this user
+    const dismissedKey = 'pendingMessageDismissed_' + userId;
+    localStorage.setItem(dismissedKey, 'true');
+  }
+  
+  // Hide the modal
+  const pendingModal = document.getElementById('pendingApprovalModal');
+  if (pendingModal) {
+    pendingModal.style.display = 'none';
+  }
+  
+  // Navigate to home
+  window.location.href = 'index.html';
+}
+
+// Make dismissPendingMessage available globally
+window.dismissPendingMessage = dismissPendingMessage;
+
+// Function to check account status and refresh dashboard
+async function checkDashboardStatus() {
+  const userId = localStorage.getItem('currentUserId');
+  if (!userId) {
+    showAlert('No user session found. Please register again.', 'warning');
+    window.location.href = 'index.html';
+    return;
+  }
+
+  try {
+    showAlert('Checking account status...', 'info');
+    const user = await API.getUser(userId);
+    
+    if (user.verified) {
+      // Check verification status
+      try {
+        const verifications = await API.getVerificationsByUserId(userId);
+        const latestVerification = verifications && verifications.length > 0 ? verifications[0] : null;
+        
+        if (latestVerification && latestVerification.status === 'approved') {
+          // User is approved - refresh the page to show dashboard
+          showAlert('Your account has been approved! Loading dashboard...', 'success');
+          localStorage.setItem('userStatus', 'approved');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking verification:', error);
+      }
+    }
+    
+    // Still pending
+    showAlert('Your account is still pending approval. Please check back later.', 'info');
+  } catch (error) {
+    console.error('Error checking account status:', error);
+    showAlert('Failed to check account status. Please try again.', 'danger');
+  }
+}
+
+// Make checkDashboardStatus available globally
+window.checkDashboardStatus = checkDashboardStatus;
+
+function showDashboardContent() {
+  // Clear the dismissed flag when user is approved
+  const userId = localStorage.getItem('currentUserId');
+  if (userId) {
+    const dismissedKey = 'pendingMessageDismissed_' + userId;
+    localStorage.removeItem(dismissedKey);
+  }
+  
+  // Hide pending approval modal
+  const pendingModal = document.getElementById('pendingApprovalModal');
+  if (pendingModal) {
+    pendingModal.style.display = 'none';
+  }
+  
+  // Show dashboard content
+  const dashboardTabs = document.getElementById('dashboardTabs');
+  const dashboardTabContent = document.getElementById('dashboardTabContent');
+  
+  if (dashboardTabs) dashboardTabs.style.display = 'block';
+  if (dashboardTabContent) dashboardTabContent.style.display = 'block';
+}
 
 async function loadAlerts() {
   const loadingState = document.getElementById('loadingState');
