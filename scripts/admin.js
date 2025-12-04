@@ -468,8 +468,40 @@ function generatePassportCode() {
 }
 
 // Initialize on load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   if (window.location.pathname.includes('admin.html')) {
+    // Check if user is admin
+    const userId = localStorage.getItem('currentUserId');
+    const classification = localStorage.getItem('userClassification');
+    
+    if (!userId) {
+      // Not logged in, redirect to index
+      window.location.href = 'index.html';
+      return;
+    }
+    
+    // Verify user is admin
+    try {
+      const user = await API.getUser(userId);
+      if (!user || user.classification !== 'admin') {
+        showAlert('Access denied. Admin privileges required.', 'danger');
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 2000);
+        return;
+      }
+      
+      // Store classification
+      localStorage.setItem('userClassification', 'admin');
+    } catch (error) {
+      console.error('Failed to verify admin access:', error);
+      showAlert('Failed to verify admin access.', 'danger');
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+      return;
+    }
+    
     loadDashboard();
     
     // Auto-refresh every 30 seconds

@@ -33,7 +33,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 await connection.OpenAsync();
 
                 using var cmd = new MySqlCommand(
-                    "SELECT id, email, is_verified, requires_review, passport_hash, created_at FROM users WHERE id = @id",
+                    "SELECT id, email, is_verified, requires_review, passport_hash, classification, created_at FROM users WHERE id = @id",
                     connection);
                 cmd.Parameters.AddWithValue("@id", id);
 
@@ -48,6 +48,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 var verifiedOrd = reader.GetOrdinal("is_verified");
                 var reviewOrd = reader.GetOrdinal("requires_review");
                 var passportOrd = reader.GetOrdinal("passport_hash");
+                var classificationOrd = reader.GetOrdinal("classification");
                 var createdOrd = reader.GetOrdinal("created_at");
 
                 var user = new
@@ -57,6 +58,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     verified = reader.GetBoolean(verifiedOrd),
                     requiresReview = reader.GetBoolean(reviewOrd),
                     passportHash = reader.IsDBNull(passportOrd) ? null : reader.GetString(passportOrd),
+                    classification = reader.IsDBNull(classificationOrd) ? "user" : reader.GetString(classificationOrd),
                     createdAt = reader.GetDateTime(createdOrd).ToString("yyyy-MM-ddTHH:mm:ss")
                 };
 
@@ -79,7 +81,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 await connection.OpenAsync();
 
                 using var cmd = new MySqlCommand(
-                    "SELECT id, email, is_verified, requires_review, passport_hash, created_at FROM users WHERE email = @email",
+                    "SELECT id, email, is_verified, requires_review, passport_hash, classification, created_at FROM users WHERE email = @email",
                     connection);
                 cmd.Parameters.AddWithValue("@email", email);
 
@@ -94,6 +96,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 var verifiedOrd = reader.GetOrdinal("is_verified");
                 var reviewOrd = reader.GetOrdinal("requires_review");
                 var passportOrd = reader.GetOrdinal("passport_hash");
+                var classificationOrd = reader.GetOrdinal("classification");
                 var createdOrd = reader.GetOrdinal("created_at");
 
                 var user = new
@@ -103,6 +106,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     verified = reader.GetBoolean(verifiedOrd),
                     requiresReview = reader.GetBoolean(reviewOrd),
                     passportHash = reader.IsDBNull(passportOrd) ? null : reader.GetString(passportOrd),
+                    classification = reader.IsDBNull(classificationOrd) ? "user" : reader.GetString(classificationOrd),
                     createdAt = reader.GetDateTime(createdOrd).ToString("yyyy-MM-ddTHH:mm:ss")
                 };
 

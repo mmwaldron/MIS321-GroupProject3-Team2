@@ -64,7 +64,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     var mfaSecret = GenerateMFASecret();
                     
                     using var insertUserCmd = new MySqlCommand(
-                        "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review)",
+                        "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review, classification) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review, 'user')",
                         connection);
                     insertUserCmd.Parameters.AddWithValue("@email", request.Email);
                     insertUserCmd.Parameters.AddWithValue("@password_hash", passwordHash);
