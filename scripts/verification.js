@@ -88,15 +88,19 @@ document.addEventListener('DOMContentLoaded', function() {
       
       try {
         // Get form elements with null checks
-        const fullNameInput = document.getElementById('fullName');
+        const firstNameInput = document.getElementById('firstName');
+        const lastNameInput = document.getElementById('lastName');
         const emailInput = document.getElementById('email');
-        const phoneInput = document.getElementById('phone');
-        const organizationInput = document.getElementById('organization');
         
         // Validate elements exist
-        if (!fullNameInput) {
-          console.error('fullName input not found');
-          showAlert('Full name field not found. Please refresh the page.', 'danger');
+        if (!firstNameInput) {
+          console.error('firstName input not found');
+          showAlert('First name field not found. Please refresh the page.', 'danger');
+          return;
+        }
+        if (!lastNameInput) {
+          console.error('lastName input not found');
+          showAlert('Last name field not found. Please refresh the page.', 'danger');
           return;
         }
         if (!emailInput) {
@@ -104,22 +108,22 @@ document.addEventListener('DOMContentLoaded', function() {
           showAlert('Email field not found. Please refresh the page.', 'danger');
           return;
         }
-        if (!phoneInput) {
-          console.error('phone input not found');
-          showAlert('Phone field not found. Please refresh the page.', 'danger');
-          return;
-        }
-        if (!organizationInput) {
-          console.error('organization input not found');
-          showAlert('Organization field not found. Please refresh the page.', 'danger');
+        
+        // Combine first and last name into full name
+        const firstName = firstNameInput.value.trim() || '';
+        const lastName = lastNameInput.value.trim() || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        if (!fullName) {
+          showAlert('Please enter both first and last name.', 'danger');
           return;
         }
         
         verificationData = {
-          name: fullNameInput.value || '',
-          email: emailInput.value || '',
-          phone: phoneInput.value || '',
-          organization: organizationInput.value || ''
+          name: fullName,
+          firstName: firstName,
+          lastName: lastName,
+          email: emailInput.value || ''
         };
         window.verificationData = verificationData; // Update global reference
         goToStep(2);
@@ -183,11 +187,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const response = await API.registerPendingUser({
           name: verificationData.name,
           email: verificationData.email,
-          phone: verificationData.phone,
-          organization: verificationData.organization,
-          govId: verificationData.govId,
+          phone: null, // Optional - not required
+          organization: null, // Optional - not required
+          govId: verificationData.govId || null,
           hasDocument: verificationData.hasDocument,
-          companyEmail: companyEmail,
+          companyEmail: companyEmail || null,
           riskScore: riskAssessment.score,
           riskLevel: riskAssessment.level,
           urgency: urgency,

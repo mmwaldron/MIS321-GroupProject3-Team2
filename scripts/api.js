@@ -12,11 +12,6 @@ const API = {
     };
 
     try {
-      // Check if we're using file:// protocol
-      if (window.location.protocol === 'file:') {
-        throw new Error('Cannot make API calls from file:// protocol. Please access this page through the web server (e.g., http://localhost:5000/dashboard.html)');
-      }
-
       const response = await fetch(url, config);
       
       // Check if response is JSON before parsing

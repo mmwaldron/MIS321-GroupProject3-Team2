@@ -33,11 +33,14 @@ async function displayCases() {
   const tbody = document.getElementById('casesTableBody');
   if (!tbody) return;
 
+  // Filter to only show pending users
+  const pendingVerifications = allVerifications.filter(v => v.status === 'pending');
+
   // Rank verifications
-  const ranked = RiskFilter.rankVerifications(allVerifications);
+  const ranked = RiskFilter.rankVerifications(pendingVerifications);
 
   if (ranked.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No cases found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No pending cases found</td></tr>';
     return;
   }
 

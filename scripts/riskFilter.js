@@ -84,6 +84,8 @@ const RiskFilter = {
 
   // Check phone format
   checkPhoneFormat(phone) {
+    // Phone is optional, so if not provided, don't add risk
+    if (!phone || phone === null || phone === '' || phone === undefined) return 0;
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length < 10) return 15;
     if (cleaned.length > 15) return 10;
@@ -99,7 +101,9 @@ const RiskFilter = {
 
   // Check organization
   checkOrganization(org) {
-    if (!org || org.length < 2) return 15;
+    // Organization is optional, so if not provided, don't add risk
+    if (!org || org === null || org === '' || org === undefined) return 0;
+    if (org.length < 2) return 15;
     const suspicious = ['test', 'fake', 'demo', 'example'];
     if (suspicious.some(s => org.toLowerCase().includes(s))) return 20;
     return 0;
@@ -135,6 +139,7 @@ const RiskFilter = {
 
   // Validate phone
   isValidPhone(phone) {
+    if (!phone || phone === null || phone === '' || phone === undefined) return false;
     const cleaned = phone.replace(/\D/g, '');
     return cleaned.length >= 10 && cleaned.length <= 15;
   },

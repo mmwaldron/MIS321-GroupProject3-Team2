@@ -155,24 +155,24 @@ function createAlertCard(alert, index) {
           <i class="bi bi-chevron-down"></i>
         </button>
       </div>
-      <div class="card-body">
-        <p class="card-text text-muted">${escapeHtml(shortDescription)}</p>
+      <div class="card-body bg-dark">
+        <p class="card-text text-light fw-bold mb-3" style="font-size: 0.95rem; line-height: 1.5;">${escapeHtml(shortDescription)}</p>
         <div class="row g-2 mb-3">
           <div class="col-6">
-            <small class="text-muted d-block">CVSS Score</small>
-            <strong>${cvssScore}</strong>
+            <small class="text-light d-block fw-semibold mb-1" style="font-size: 0.85rem;">CVSS Score</small>
+            <strong class="text-white" style="font-size: 1.15rem; font-weight: 700;">${cvssScore}</strong>
           </div>
           <div class="col-6">
-            <small class="text-muted d-block">Risk Score</small>
-            <strong>${riskScore}</strong>
+            <small class="text-light d-block fw-semibold mb-1" style="font-size: 0.85rem;">Risk Score</small>
+            <strong class="text-white" style="font-size: 1.15rem; font-weight: 700;">${riskScore}</strong>
           </div>
           <div class="col-6">
-            <small class="text-muted d-block">Trust Score</small>
-            <strong class="text-success">${trustScore}</strong>
+            <small class="text-light d-block fw-semibold mb-1" style="font-size: 0.85rem;">Trust Score</small>
+            <strong class="text-success fw-bold" style="font-size: 1.15rem; font-weight: 700;">${trustScore}</strong>
           </div>
           <div class="col-6">
-            <small class="text-muted d-block">Processed</small>
-            <small>${processedDate}</small>
+            <small class="text-light d-block fw-semibold mb-1" style="font-size: 0.85rem;">Processed</small>
+            <small class="text-white fw-normal" style="font-size: 0.9rem;">${processedDate}</small>
           </div>
         </div>
       </div>
