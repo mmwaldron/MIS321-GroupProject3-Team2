@@ -1,24 +1,46 @@
 // Main Application Logic
 function showAlert(message, type = 'info') {
   const alertContainer = document.getElementById('alertContainer');
-  if (!alertContainer) return;
+  if (!alertContainer) {
+    console.warn('Alert container not found. Creating fallback alert.');
+    // Fallback: use browser alert if container doesn't exist
+    alert(message);
+    return;
+  }
 
   const alertId = 'alert-' + Date.now();
   const alert = document.createElement('div');
   alert.id = alertId;
   alert.className = `alert alert-${type} alert-dismissible fade show alert-notification`;
+  alert.setAttribute('role', 'alert');
   alert.innerHTML = `
-    ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <div style="flex: 1; padding-right: 1rem;">
+      ${message}
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
   `;
 
   alertContainer.appendChild(alert);
 
-  // Auto-dismiss after 5 seconds
+  // Scroll alert into view if needed
+  alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Auto-dismiss after 7 seconds (increased from 5 for better visibility)
   setTimeout(() => {
     const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
-    if (bsAlert) bsAlert.close();
-  }, 5000);
+    if (bsAlert) {
+      bsAlert.close();
+    } else {
+      // Fallback if Bootstrap alert instance not available
+      alert.style.opacity = '0';
+      alert.style.transform = 'translateX(120%)';
+      setTimeout(() => {
+        if (alert.parentNode) {
+          alert.parentNode.removeChild(alert);
+        }
+      }, 400);
+    }
+  }, 7000);
 }
 
 // Format passport code input (numbers only)

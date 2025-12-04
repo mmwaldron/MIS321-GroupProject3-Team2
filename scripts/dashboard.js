@@ -165,7 +165,6 @@ function createAlertCard(alert, index) {
         </button>
       </div>
       <div class="card-body bg-dark">
-<<<<<<< HEAD
         <p class="card-text text-light fw-bold mb-3" style="font-size: 0.95rem; line-height: 1.5;">${escapeHtml(shortDescription)}</p>
         <div class="row g-2 mb-3">
           <div class="col-6">
@@ -183,25 +182,6 @@ function createAlertCard(alert, index) {
           <div class="col-6">
             <small class="text-light d-block fw-semibold mb-1" style="font-size: 0.85rem;">Processed</small>
             <small class="text-white fw-normal" style="font-size: 0.9rem;">${processedDate}</small>
-=======
-        <p class="card-text text-light fw-bold mb-3" style="font-size: 0.95rem;">${escapeHtml(shortDescription)}</p>
-        <div class="row g-2 mb-3">
-          <div class="col-6">
-            <small class="text-light d-block fw-semibold mb-1">CVSS Score</small>
-            <strong class="text-white" style="font-size: 1.1rem;">${cvssScore}</strong>
-          </div>
-          <div class="col-6">
-            <small class="text-light d-block fw-semibold mb-1">Risk Score</small>
-            <strong class="text-white" style="font-size: 1.1rem;">${riskScore}</strong>
-          </div>
-          <div class="col-6">
-            <small class="text-light d-block fw-semibold mb-1">Trust Score</small>
-            <strong class="text-success fw-bold" style="font-size: 1.1rem;">${trustScore}</strong>
-          </div>
-          <div class="col-6">
-            <small class="text-light d-block fw-semibold mb-1">Processed</small>
-            <small class="text-white fw-normal">${processedDate}</small>
->>>>>>> 91517766b5bbbd52a76349a4368aef68139592e1
           </div>
         </div>
       </div>
