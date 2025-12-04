@@ -73,3 +73,4 @@
 /Users/mollywaldron/Documents/MIS321/MIS321-GroupProject3-Team2/api/obj/Debug/net9.0/MIS321-GroupProject3-Team2.pdb
 /Users/mollywaldron/Documents/MIS321/MIS321-GroupProject3-Team2/api/obj/Debug/net9.0/MIS321-GroupProject3-Team2.genruntimeconfig.cache
 /Users/mollywaldron/Documents/MIS321/MIS321-GroupProject3-Team2/api/obj/Debug/net9.0/ref/MIS321-GroupProject3-Team2.dll
+/Users/mollywaldron/Documents/MIS321/MIS321-GroupProject3-Team2/api/bin/Debug/net9.0/QRCoder.dll

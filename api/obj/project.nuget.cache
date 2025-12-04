@@ -1,11 +1,23 @@
 {
   "version": 2,
+<<<<<<< HEAD
   "dgSpecHash": "EOnTM7/txoM=",
   "success": true,
   "projectFilePath": "C:\\Users\\tasta\\Downloads\\MIS321-GroupProject3-Team2\\api\\MIS321-GroupProject3-Team2.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\tasta\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\7.0.1\\microsoft.extensions.logging.abstractions.7.0.1.nupkg.sha512",
     "C:\\Users\\tasta\\.nuget\\packages\\mysqlconnector\\2.3.7\\mysqlconnector.2.3.7.nupkg.sha512"
+=======
+  "dgSpecHash": "Om9DhxqAh18=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\tasta\\Downloads\\MIS321-GroupProject3-Team2\\api\\MIS321-GroupProject3-Team2.csproj",
+  "expectedPackageFiles": [
+    "/Users/mollywaldron/.nuget/packages/microsoft.aspnetcore.openapi/9.0.1/microsoft.aspnetcore.openapi.9.0.1.nupkg.sha512",
+    "/Users/mollywaldron/.nuget/packages/microsoft.extensions.logging.abstractions/7.0.1/microsoft.extensions.logging.abstractions.7.0.1.nupkg.sha512",
+    "/Users/mollywaldron/.nuget/packages/microsoft.openapi/1.6.17/microsoft.openapi.1.6.17.nupkg.sha512",
+    "/Users/mollywaldron/.nuget/packages/mysqlconnector/2.3.7/mysqlconnector.2.3.7.nupkg.sha512",
+    "/Users/mollywaldron/.nuget/packages/qrcoder/1.6.0/qrcoder.1.6.0.nupkg.sha512"
+>>>>>>> 91517766b5bbbd52a76349a4368aef68139592e1
   ],
   "logs": []
 }
