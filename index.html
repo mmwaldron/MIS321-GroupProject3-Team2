@@ -88,36 +88,6 @@
         </div>
       </div>
 
-      <!-- Admin Login -->
-      <div class="row justify-content-center mb-4">
-        <div class="col-lg-8">
-          <div class="card border-warning">
-            <div class="card-body p-4">
-              <div class="text-center mb-3">
-                <i class="bi bi-shield-lock text-warning" style="font-size: 2.5rem;"></i>
-                <h4 class="mt-2 mb-1 text-warning">Admin Login</h4>
-                <p class="text-muted mb-0">Administrator access portal</p>
-              </div>
-              <form id="adminLoginForm" onsubmit="adminLogin(event)">
-                <div class="mb-3">
-                  <label class="form-label">Admin Email</label>
-                  <input
-                    type="email"
-                    class="form-control bg-dark text-light border-warning"
-                    id="adminEmail"
-                    placeholder="whitney@email.com"
-                    required
-                  />
-                </div>
-                <button type="submit" class="btn btn-warning w-100">
-                  <i class="bi bi-box-arrow-in-right"></i> Login as Admin
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Passport Code Lookup -->
       <div class="row justify-content-center mb-4">
         <div class="col-lg-8">
@@ -126,27 +96,8 @@
               <div class="text-center mb-3">
                 <i class="bi bi-passport text-success" style="font-size: 2.5rem;"></i>
                 <h4 class="mt-2 mb-1 text-success">Access Your Passport</h4>
-                <p class="text-muted mb-0">Upload your QR code or enter your 10-digit passport code</p>
+                <p class="text-muted mb-0">Enter your 10-digit passport code to view your BioTrust Passport</p>
               </div>
-              
-              <!-- QR Code Upload -->
-              <div class="mb-3">
-                <label class="form-label">Upload QR Code</label>
-                <input
-                  type="file"
-                  class="form-control bg-dark text-light border-success"
-                  id="qrCodeUpload"
-                  accept="image/*"
-                  onchange="handleQRUpload(event)"
-                />
-                <small class="text-muted">Upload the QR code file provided by admin</small>
-              </div>
-
-              <div class="text-center my-3">
-                <span class="text-muted">OR</span>
-              </div>
-
-              <!-- Manual Code Entry -->
               <form id="passportCodeForm" onsubmit="lookupPassport(event)">
                 <div class="input-group input-group-lg">
                   <input
@@ -156,6 +107,7 @@
                     placeholder="0000000000"
                     maxlength="10"
                     pattern="[0-9]{10}"
+                    required
                     inputmode="numeric"
                     style="font-size: 1.5rem; letter-spacing: 0.5rem; font-family: 'Courier New', monospace;"
                     oninput="formatPassportCode(this)"
@@ -195,14 +147,25 @@
                     Personal Information
                   </h5>
                   <form id="basicInfoForm">
-                    <div class="mb-3">
-                      <label class="form-label">Full Name</label>
-                      <input
-                        type="text"
-                        class="form-control bg-dark text-light border-success"
-                        id="fullName"
-                        required
-                      />
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">First Name</label>
+                        <input
+                          type="text"
+                          class="form-control bg-dark text-light border-success"
+                          id="firstName"
+                          required
+                        />
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Last Name</label>
+                        <input
+                          type="text"
+                          class="form-control bg-dark text-light border-success"
+                          id="lastName"
+                          required
+                        />
+                      </div>
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Email</label>
@@ -210,24 +173,6 @@
                         type="email"
                         class="form-control bg-dark text-light border-success"
                         id="email"
-                        required
-                      />
-                    </div>
-                    <div class="mb-3">
-                      <label class="form-label">Phone Number</label>
-                      <input
-                        type="tel"
-                        class="form-control bg-dark text-light border-success"
-                        id="phone"
-                        required
-                      />
-                    </div>
-                    <div class="mb-3">
-                      <label class="form-label">Organization</label>
-                      <input
-                        type="text"
-                        class="form-control bg-dark text-light border-success"
-                        id="organization"
                         required
                       />
                     </div>
@@ -457,9 +402,6 @@
 
     <!-- Google reCAPTCHA v2 -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-    
-    <!-- jsQR Library for QR code decoding -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
     <!-- Bootstrap JS bundle -->
     <script
@@ -474,30 +416,14 @@
     <script src="./scripts/riskFilter.js"></script>
     <script src="./scripts/trustScore.js"></script>
     <script>
-      // Redirect logged-in users based on classification
+      // Redirect logged-in users to dashboard immediately (before other scripts load)
       (function() {
         const userId = localStorage.getItem('currentUserId');
-        const classification = localStorage.getItem('userClassification');
         if (userId) {
-          // User is logged in, redirect based on classification
-          if (classification === 'admin') {
-            window.location.replace('admin.html');
-          } else {
-            window.location.replace('dashboard.html');
-          }
+          // User is logged in, redirect to dashboard immediately
+          window.location.replace('dashboard.html');
         }
       })();
-      
-      // Make logout function available globally
-      function logout() {
-        localStorage.removeItem('currentUserId');
-        localStorage.removeItem('currentPassportCode');
-        localStorage.removeItem('currentUserEmail');
-        localStorage.removeItem('userStatus');
-        localStorage.removeItem('verificationId');
-        localStorage.removeItem('userClassification');
-        window.location.href = 'index.html';
-      }
     </script>
     <script src="./scripts/verification.js"></script>
     <script src="./scripts/main.js"></script>

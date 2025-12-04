@@ -91,18 +91,27 @@ function createAlertCard(alert, index) {
   const col = document.createElement('div');
   col.className = 'col-md-6 col-lg-4';
 
-  // Determine tier badge color
+  // Determine tier badge color and header background
   let badgeClass = 'bg-secondary';
   let badgeText = 'Unknown';
+  let headerBgClass = 'bg-dark';
+  let headerTextClass = 'text-light';
+  
   if (alert.tier === 'red') {
     badgeClass = 'bg-danger';
     badgeText = 'High Priority';
+    headerBgClass = 'bg-danger'; // Strong red background
+    headerTextClass = 'text-white';
   } else if (alert.tier === 'yellow') {
     badgeClass = 'bg-warning';
     badgeText = 'Medium Priority';
+    headerBgClass = 'bg-warning'; // Strong yellow background
+    headerTextClass = 'text-dark';
   } else if (alert.tier === 'green') {
     badgeClass = 'bg-success';
     badgeText = 'Low Priority';
+    headerBgClass = 'bg-success'; // Strong green background
+    headerTextClass = 'text-white';
   }
 
   // Create unique ID for collapse
@@ -139,13 +148,13 @@ function createAlertCard(alert, index) {
 
   col.innerHTML = `
     <div class="card h-100 border-${alert.tier === 'red' ? 'danger' : alert.tier === 'yellow' ? 'warning' : 'success'}">
-      <div class="card-header bg-dark d-flex justify-content-between align-items-center">
+      <div class="card-header ${headerBgClass} d-flex justify-content-between align-items-center border-bottom border-${alert.tier === 'red' ? 'danger' : alert.tier === 'yellow' ? 'warning' : 'success'} border-2" style="${alert.tier === 'red' ? 'background-color: #dc3545 !important;' : alert.tier === 'yellow' ? 'background-color: #ffc107 !important;' : 'background-color: #28a745 !important;'}">
         <div>
-          <span class="badge ${badgeClass} me-2">${badgeText}</span>
-          <strong class="text-light">${alert.cve_id || 'Unknown CVE'}</strong>
+          <span class="badge ${badgeClass === 'bg-danger' ? 'bg-dark' : badgeClass === 'bg-warning' ? 'bg-dark' : 'bg-dark'} me-2">${badgeText}</span>
+          <strong class="${headerTextClass}">${alert.cve_id || 'Unknown CVE'}</strong>
         </div>
         <button
-          class="btn btn-sm btn-outline-light"
+          class="btn btn-sm btn-outline-${alert.tier === 'red' ? 'light' : alert.tier === 'yellow' ? 'dark' : 'light'}"
           type="button"
           data-bs-toggle="collapse"
           data-bs-target="#${collapseId}"
@@ -155,24 +164,24 @@ function createAlertCard(alert, index) {
           <i class="bi bi-chevron-down"></i>
         </button>
       </div>
-      <div class="card-body">
-        <p class="card-text text-muted">${escapeHtml(shortDescription)}</p>
+      <div class="card-body bg-dark">
+        <p class="card-text text-light fw-bold mb-3" style="font-size: 0.95rem;">${escapeHtml(shortDescription)}</p>
         <div class="row g-2 mb-3">
           <div class="col-6">
-            <small class="text-muted d-block">CVSS Score</small>
-            <strong>${cvssScore}</strong>
+            <small class="text-light d-block fw-semibold mb-1">CVSS Score</small>
+            <strong class="text-white" style="font-size: 1.1rem;">${cvssScore}</strong>
           </div>
           <div class="col-6">
-            <small class="text-muted d-block">Risk Score</small>
-            <strong>${riskScore}</strong>
+            <small class="text-light d-block fw-semibold mb-1">Risk Score</small>
+            <strong class="text-white" style="font-size: 1.1rem;">${riskScore}</strong>
           </div>
           <div class="col-6">
-            <small class="text-muted d-block">Trust Score</small>
-            <strong class="text-success">${trustScore}</strong>
+            <small class="text-light d-block fw-semibold mb-1">Trust Score</small>
+            <strong class="text-success fw-bold" style="font-size: 1.1rem;">${trustScore}</strong>
           </div>
           <div class="col-6">
-            <small class="text-muted d-block">Processed</small>
-            <small>${processedDate}</small>
+            <small class="text-light d-block fw-semibold mb-1">Processed</small>
+            <small class="text-white fw-normal">${processedDate}</small>
           </div>
         </div>
       </div>

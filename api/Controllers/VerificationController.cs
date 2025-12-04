@@ -33,6 +33,16 @@ namespace MIS321_GroupProject3_Team2.Controllers
         {
             try
             {
+                // Validate required fields
+                if (string.IsNullOrWhiteSpace(request.Name))
+                {
+                    return BadRequest(new { success = false, message = "Name is required" });
+                }
+                if (string.IsNullOrWhiteSpace(request.Email))
+                {
+                    return BadRequest(new { success = false, message = "Email is required" });
+                }
+                
                 var connString = ParseConnectionString(_connectionString);
 
                 using var connection = new MySqlConnection(connString);
@@ -79,15 +89,15 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 // Store verification data as JSON in reason field
                 var verificationData = JsonSerializer.Serialize(new
                 {
-                    name = request.Name,
-                    email = request.Email,
-                    phone = request.Phone,
-                    organization = request.Organization,
-                    govId = request.GovId,
+                    name = request.Name ?? "",
+                    email = request.Email ?? "",
+                    phone = request.Phone ?? "",
+                    organization = request.Organization ?? "",
+                    govId = request.GovId ?? "",
                     hasDocument = request.HasDocument,
-                    companyEmail = request.CompanyEmail,
+                    companyEmail = request.CompanyEmail ?? "",
                     riskScore = request.RiskScore,
-                    riskLevel = request.RiskLevel,
+                    riskLevel = request.RiskLevel ?? "low",
                     urgency = request.Urgency,
                     credibility = request.Credibility,
                     trustScore = request.TrustScore,
@@ -889,8 +899,8 @@ Bio-Isac Team
     {
         public string Name { get; set; } = "";
         public string Email { get; set; } = "";
-        public string Phone { get; set; } = "";
-        public string Organization { get; set; } = "";
+        public string? Phone { get; set; }
+        public string? Organization { get; set; }
         public string? GovId { get; set; }
         public bool HasDocument { get; set; }
         public string? CompanyEmail { get; set; }

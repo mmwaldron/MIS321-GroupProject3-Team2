@@ -12,11 +12,6 @@ const API = {
     };
 
     try {
-      // Check if we're using file:// protocol
-      if (window.location.protocol === 'file:') {
-        throw new Error('Cannot make API calls from file:// protocol. Please access this page through the web server (e.g., http://localhost:5000/dashboard.html)');
-      }
-
       const response = await fetch(url, config);
       
       // Check if response is JSON before parsing
@@ -30,7 +25,12 @@ const API = {
       }
       
       if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        // If the response has a message, use it; otherwise use status text
+        const errorMessage = data?.message || data?.error || `HTTP error! status: ${response.status}`;
+        const error = new Error(errorMessage);
+        error.response = data; // Attach full response for debugging
+        error.status = response.status;
+        throw error;
       }
       
       return data;
@@ -38,8 +38,22 @@ const API = {
       console.error('API request failed:', error);
       
       // Provide helpful error messages
-      if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
-        throw new Error('Cannot connect to the API server. Make sure the backend server is running and accessible.');
+      if (error.message.includes('Failed to fetch') || error.message.includes('CORS') || error.name === 'TypeError') {
+        const isFileProtocol = window.location.protocol === 'file:';
+        const port = localStorage.getItem('apiPort') || '5143';
+        const serverUrl = `http://localhost:${port}`;
+        
+        if (isFileProtocol) {
+          const errorMsg = `Cannot connect to the API server at ${serverUrl}.\n\n` +
+            `Please start the backend server:\n` +
+            `1. Open a terminal\n` +
+            `2. Navigate to the 'api' folder\n` +
+            `3. Run: dotnet run\n\n` +
+            `Then refresh this page.`;
+          throw new Error(errorMsg);
+        } else {
+          throw new Error('Cannot connect to the API server. Make sure the backend server is running.');
+        }
       }
       
       throw error;

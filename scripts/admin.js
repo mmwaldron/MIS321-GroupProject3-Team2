@@ -33,11 +33,14 @@ async function displayCases() {
   const tbody = document.getElementById('casesTableBody');
   if (!tbody) return;
 
+  // Filter to only show pending users
+  const pendingVerifications = allVerifications.filter(v => v.status === 'pending');
+
   // Rank verifications
-  const ranked = RiskFilter.rankVerifications(allVerifications);
+  const ranked = RiskFilter.rankVerifications(pendingVerifications);
 
   if (ranked.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No cases found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No pending cases found</td></tr>';
     return;
   }
 
@@ -183,10 +186,10 @@ async function approveCase() {
     // Approve verification via API
     const result = await API.approveVerification(currentCaseId, adminNotes);
     
-    // Show passport code and QR code to admin
+    // Show passport code to admin
     if (result.passportCode) {
-      displayPassportQR(result.passportCode, result.qrCodeBase64);
-      showPassportModal(result.passportCode, result.qrCodeBase64);
+      document.getElementById('passportCodeDisplay').textContent = result.passportCode;
+      alert(`Verification approved!\n\nPassport Code: ${result.passportCode}\n\nShare this code with the user to access their passport.`);
     }
 
     // Refresh dashboard
@@ -194,7 +197,7 @@ async function approveCase() {
     await updateStats();
     await displayCases();
 
-    // Close case modal
+    // Close modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('caseModal'));
     modal.hide();
 
@@ -203,85 +206,6 @@ async function approveCase() {
     console.error('Failed to approve case:', error);
     showAlert('Failed to approve verification. Please try again.', 'danger');
   }
-}
-
-function displayPassportQR(code, qrBase64) {
-  const passportDisplay = document.getElementById('passportCodeDisplay');
-  if (passportDisplay) {
-    passportDisplay.innerHTML = `
-      <div class="d-flex flex-column align-items-center">
-        <code style="font-family: 'Courier New', monospace; color: var(--primary-green); font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;">${code}</code>
-        ${qrBase64 ? `<img src="data:image/png;base64,${qrBase64}" alt="QR Code" style="max-width: 200px; border: 2px solid var(--primary-green); padding: 10px; background: white;" />` : ''}
-      </div>
-    `;
-  }
-}
-
-function showPassportModal(code, qrBase64) {
-  let modal = document.getElementById('passportModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'passportModal';
-    modal.className = 'modal fade';
-    modal.innerHTML = `
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark border-success">
-          <div class="modal-header border-success">
-            <h5 class="modal-title text-success">Passport Generated</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body text-center">
-            <p class="text-light mb-3">Share this passport code with the user:</p>
-            <code id="modalPassportCode" class="bg-dark text-success p-3 rounded d-block mb-3" style="font-size: 1.5rem; font-family: 'Courier New', monospace;">${code}</code>
-            <div id="modalQRCode" class="mb-3"></div>
-            <div class="d-flex gap-2 justify-content-center">
-              <button class="btn btn-success" onclick="downloadPassportQR('${code}', '${qrBase64 || ''}')">
-                <i class="bi bi-download"></i> Download QR Code
-              </button>
-              <button class="btn btn-outline-success" onclick="copyPassportCode('${code}')">
-                <i class="bi bi-clipboard"></i> Copy Code
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-  } else {
-    document.getElementById('modalPassportCode').textContent = code;
-    const qrContainer = document.getElementById('modalQRCode');
-    if (qrContainer) {
-      qrContainer.innerHTML = qrBase64 
-        ? `<img src="data:image/png;base64,${qrBase64}" alt="QR Code" style="max-width: 250px; border: 2px solid var(--primary-green); padding: 10px; background: white;" />`
-        : '';
-    }
-  }
-  
-  const bsModal = new bootstrap.Modal(modal);
-  bsModal.show();
-}
-
-function downloadPassportQR(code, qrBase64) {
-  if (!qrBase64) {
-    showAlert('QR code not available for download', 'warning');
-    return;
-  }
-  
-  const link = document.createElement('a');
-  link.href = `data:image/png;base64,${qrBase64}`;
-  link.download = `passport-${code}.png`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  showAlert('QR code downloaded successfully!', 'success');
-}
-
-function copyPassportCode(code) {
-  navigator.clipboard.writeText(code).then(() => {
-    showAlert('Passport code copied to clipboard!', 'success');
-  }).catch(() => {
-    showAlert('Failed to copy code', 'danger');
-  });
 }
 
 async function denyCase() {
@@ -314,11 +238,12 @@ function applyFilters() {
   const riskFilter = document.getElementById('filterRisk').value;
   const sortBy = document.getElementById('sortBy').value;
 
-  let filtered = [...allVerifications];
+  // Start with only pending users by default
+  let filtered = allVerifications.filter(v => v.status === 'pending');
 
-  // Filter by status
-  if (statusFilter !== 'all') {
-    filtered = filtered.filter(v => v.status === statusFilter);
+  // If user explicitly selects a different status, show that instead
+  if (statusFilter !== 'all' && statusFilter !== 'pending') {
+    filtered = allVerifications.filter(v => v.status === statusFilter);
   }
 
   // Filter by risk
@@ -468,40 +393,8 @@ function generatePassportCode() {
 }
 
 // Initialize on load
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', function() {
   if (window.location.pathname.includes('admin.html')) {
-    // Check if user is admin
-    const userId = localStorage.getItem('currentUserId');
-    const classification = localStorage.getItem('userClassification');
-    
-    if (!userId) {
-      // Not logged in, redirect to index
-      window.location.href = 'index.html';
-      return;
-    }
-    
-    // Verify user is admin
-    try {
-      const user = await API.getUser(userId);
-      if (!user || user.classification !== 'admin') {
-        showAlert('Access denied. Admin privileges required.', 'danger');
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 2000);
-        return;
-      }
-      
-      // Store classification
-      localStorage.setItem('userClassification', 'admin');
-    } catch (error) {
-      console.error('Failed to verify admin access:', error);
-      showAlert('Failed to verify admin access.', 'danger');
-      setTimeout(() => {
-        window.location.href = 'index.html';
-      }, 2000);
-      return;
-    }
-    
     loadDashboard();
     
     // Auto-refresh every 30 seconds
