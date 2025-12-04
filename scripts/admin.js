@@ -33,11 +33,14 @@ async function displayCases() {
   const tbody = document.getElementById('casesTableBody');
   if (!tbody) return;
 
+  // Filter to only show pending users
+  const pendingVerifications = allVerifications.filter(v => v.status === 'pending');
+
   // Rank verifications
-  const ranked = RiskFilter.rankVerifications(allVerifications);
+  const ranked = RiskFilter.rankVerifications(pendingVerifications);
 
   if (ranked.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No cases found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No pending cases found</td></tr>';
     return;
   }
 
@@ -235,11 +238,12 @@ function applyFilters() {
   const riskFilter = document.getElementById('filterRisk').value;
   const sortBy = document.getElementById('sortBy').value;
 
-  let filtered = [...allVerifications];
+  // Start with only pending users by default
+  let filtered = allVerifications.filter(v => v.status === 'pending');
 
-  // Filter by status
-  if (statusFilter !== 'all') {
-    filtered = filtered.filter(v => v.status === statusFilter);
+  // If user explicitly selects a different status, show that instead
+  if (statusFilter !== 'all' && statusFilter !== 'pending') {
+    filtered = allVerifications.filter(v => v.status === statusFilter);
   }
 
   // Filter by risk

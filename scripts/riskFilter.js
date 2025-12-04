@@ -56,11 +56,12 @@ const RiskFilter = {
     if (verificationData.hasDocument) credibility += 20;
     if (verificationData.emailVerified) credibility += 15;
     if (this.isValidEmailDomain(verificationData.email)) credibility += 10;
-    if (this.isValidOrganization(verificationData.organization)) credibility += 10;
+    if (verificationData.organization && this.isValidOrganization(verificationData.organization)) credibility += 10;
 
     // Negative factors
     if (!verificationData.govId || verificationData.govId.length < 4) credibility -= 15;
-    if (!this.isValidPhone(verificationData.phone)) credibility -= 10;
+    // Phone is optional, only penalize if provided and invalid
+    if (verificationData.phone && !this.isValidPhone(verificationData.phone)) credibility -= 10;
 
     return Math.max(0, Math.min(100, credibility));
   },
@@ -84,6 +85,8 @@ const RiskFilter = {
 
   // Check phone format
   checkPhoneFormat(phone) {
+    // Phone is optional, so if not provided, don't add risk
+    if (!phone || phone === null || phone === '') return 0;
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length < 10) return 15;
     if (cleaned.length > 15) return 10;
@@ -99,7 +102,9 @@ const RiskFilter = {
 
   // Check organization
   checkOrganization(org) {
-    if (!org || org.length < 2) return 15;
+    // Organization is optional, so if not provided, don't add risk
+    if (!org || org === null || org === '') return 0;
+    if (org.length < 2) return 15;
     const suspicious = ['test', 'fake', 'demo', 'example'];
     if (suspicious.some(s => org.toLowerCase().includes(s))) return 20;
     return 0;
@@ -135,6 +140,7 @@ const RiskFilter = {
 
   // Validate phone
   isValidPhone(phone) {
+    if (!phone || phone === null || phone === '') return false;
     const cleaned = phone.replace(/\D/g, '');
     return cleaned.length >= 10 && cleaned.length <= 15;
   },
