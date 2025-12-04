@@ -96,8 +96,27 @@
               <div class="text-center mb-3">
                 <i class="bi bi-passport text-success" style="font-size: 2.5rem;"></i>
                 <h4 class="mt-2 mb-1 text-success">Access Your Passport</h4>
-                <p class="text-muted mb-0">Enter your 10-digit passport code to view your BioTrust Passport</p>
+                <p class="text-muted mb-0">Upload your QR code or enter your 10-digit passport code</p>
               </div>
+              
+              <!-- QR Code Upload -->
+              <div class="mb-3">
+                <label class="form-label">Upload QR Code</label>
+                <input
+                  type="file"
+                  class="form-control bg-dark text-light border-success"
+                  id="qrCodeUpload"
+                  accept="image/*"
+                  onchange="handleQRUpload(event)"
+                />
+                <small class="text-muted">Upload the QR code file provided by admin</small>
+              </div>
+
+              <div class="text-center my-3">
+                <span class="text-muted">OR</span>
+              </div>
+
+              <!-- Manual Code Entry -->
               <form id="passportCodeForm" onsubmit="lookupPassport(event)">
                 <div class="input-group input-group-lg">
                   <input
@@ -107,7 +126,6 @@
                     placeholder="0000000000"
                     maxlength="10"
                     pattern="[0-9]{10}"
-                    required
                     inputmode="numeric"
                     style="font-size: 1.5rem; letter-spacing: 0.5rem; font-family: 'Courier New', monospace;"
                     oninput="formatPassportCode(this)"
@@ -409,6 +427,9 @@
 
     <!-- Google reCAPTCHA v2 -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    
+    <!-- jsQR Library for QR code decoding -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
     <!-- Bootstrap JS bundle -->
     <script
@@ -431,6 +452,16 @@
           window.location.replace('dashboard.html');
         }
       })();
+      
+      // Make logout function available globally
+      function logout() {
+        localStorage.removeItem('currentUserId');
+        localStorage.removeItem('currentPassportCode');
+        localStorage.removeItem('currentUserEmail');
+        localStorage.removeItem('userStatus');
+        localStorage.removeItem('verificationId');
+        window.location.href = 'index.html';
+      }
     </script>
     <script src="./scripts/verification.js"></script>
     <script src="./scripts/main.js"></script>

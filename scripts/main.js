@@ -27,6 +27,76 @@ function formatPassportCode(input) {
   input.value = input.value.replace(/\D/g, '').slice(0, 10);
 }
 
+// Handle QR code upload
+async function handleQRUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    showAlert('Processing QR code...', 'info');
+    
+    // Create image element to decode QR
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    img.onload = async function() {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Use jsQR to decode (loaded via CDN)
+      if (typeof jsQR === 'undefined') {
+        showAlert('QR code decoder not loaded. Please refresh the page.', 'danger');
+        return;
+      }
+      
+      const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (!qrCode) {
+        showAlert('Could not decode QR code. Please ensure the image is clear and try again.', 'danger');
+        return;
+      }
+      
+      const code = qrCode.data.trim();
+      
+      // Verify the code format
+      if (!code || code.length !== 10 || !/^\d{10}$/.test(code)) {
+        showAlert('Invalid passport code in QR code. Please contact admin.', 'danger');
+        return;
+      }
+      
+      // Verify and login with the code
+      try {
+        const passport = await API.verifyQRCode(code);
+        
+        if (!passport || !passport.verified) {
+          showAlert('This passport has not been verified yet. Please wait for admin approval.', 'warning');
+          return;
+        }
+
+        // Store code and redirect to dashboard
+        localStorage.setItem('currentPassportCode', code);
+        localStorage.setItem('currentUserId', passport.userId);
+        window.location.href = 'dashboard.html';
+      } catch (error) {
+        showAlert('Invalid QR code. Please verify the file and try again.', 'danger');
+      }
+    };
+    
+    img.onerror = function() {
+      showAlert('Failed to load image. Please ensure it is a valid image file.', 'danger');
+    };
+    
+    img.src = URL.createObjectURL(file);
+  } catch (error) {
+    console.error('Error processing QR code:', error);
+    showAlert('Error processing QR code. Please try again.', 'danger');
+  }
+}
+
 // Lookup passport by code
 async function lookupPassport(event) {
   event.preventDefault();
@@ -118,6 +188,19 @@ async function checkUserStatus() {
     localStorage.removeItem('currentUserId');
     localStorage.removeItem('userStatus');
   }
+}
+
+// Logout function
+function logout() {
+  // Clear all localStorage data
+  localStorage.removeItem('currentUserId');
+  localStorage.removeItem('currentPassportCode');
+  localStorage.removeItem('currentUserEmail');
+  localStorage.removeItem('userStatus');
+  localStorage.removeItem('verificationId');
+  
+  // Redirect to login/verification page
+  window.location.href = 'index.html';
 }
 
 // Check for alerts on page load
