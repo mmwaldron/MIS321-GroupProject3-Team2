@@ -77,10 +77,25 @@ async function handleQRUpload(event) {
           return;
         }
 
-        // Store code and redirect to dashboard
+        // Store code and check user classification
         localStorage.setItem('currentPassportCode', code);
         localStorage.setItem('currentUserId', passport.userId);
-        window.location.href = 'dashboard.html';
+        
+        // Get user details to check classification
+        try {
+          const user = await API.getUser(passport.userId);
+          if (user && user.classification === 'admin') {
+            localStorage.setItem('userClassification', 'admin');
+            window.location.href = 'admin.html';
+          } else {
+            localStorage.setItem('userClassification', 'user');
+            window.location.href = 'dashboard.html';
+          }
+        } catch (error) {
+          // Default to dashboard if classification check fails
+          localStorage.setItem('userClassification', 'user');
+          window.location.href = 'dashboard.html';
+        }
       } catch (error) {
         showAlert('Invalid QR code. Please verify the file and try again.', 'danger');
       }
@@ -124,10 +139,25 @@ async function lookupPassport(event) {
       return;
     }
 
-    // Store code and redirect to dashboard
+    // Store code and check user classification
     localStorage.setItem('currentPassportCode', code);
     localStorage.setItem('currentUserId', passport.userId);
-    window.location.href = 'dashboard.html';
+    
+    // Get user details to check classification
+    try {
+      const user = await API.getUser(passport.userId);
+      if (user && user.classification === 'admin') {
+        localStorage.setItem('userClassification', 'admin');
+        window.location.href = 'admin.html';
+      } else {
+        localStorage.setItem('userClassification', 'user');
+        window.location.href = 'dashboard.html';
+      }
+    } catch (error) {
+      // Default to dashboard if classification check fails
+      localStorage.setItem('userClassification', 'user');
+      window.location.href = 'dashboard.html';
+    }
   } catch (error) {
     showAlert('Passport code not found. Please verify your code and try again.', 'danger');
   }
@@ -190,6 +220,43 @@ async function checkUserStatus() {
   }
 }
 
+// Admin login function
+async function adminLogin(event) {
+  event.preventDefault();
+  
+  const emailInput = document.getElementById('adminEmail');
+  if (!emailInput) {
+    showAlert('Admin email input not found.', 'danger');
+    return;
+  }
+  
+  const email = emailInput.value.trim();
+  
+  if (!email) {
+    showAlert('Please enter an admin email address.', 'danger');
+    return;
+  }
+  
+  try {
+    const result = await API.adminLogin(email);
+    
+    if (result && result.verified && result.classification === 'admin') {
+      // Store admin session
+      localStorage.setItem('currentUserId', result.userId);
+      localStorage.setItem('currentUserEmail', email);
+      localStorage.setItem('userClassification', 'admin');
+      
+      // Redirect to admin portal
+      window.location.href = 'admin.html';
+    } else {
+      showAlert('Invalid admin credentials or insufficient privileges.', 'danger');
+    }
+  } catch (error) {
+    console.error('Admin login error:', error);
+    showAlert(error.message || 'Failed to login as admin. Please check your credentials.', 'danger');
+  }
+}
+
 // Logout function
 function logout() {
   // Clear all localStorage data
@@ -198,6 +265,7 @@ function logout() {
   localStorage.removeItem('currentUserEmail');
   localStorage.removeItem('userStatus');
   localStorage.removeItem('verificationId');
+  localStorage.removeItem('userClassification');
   
   // Redirect to login/verification page
   window.location.href = 'index.html';

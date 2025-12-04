@@ -51,9 +51,9 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 // Generate MFA secret (simple 4-digit code for now)
                 var mfaSecret = GenerateMFASecret();
 
-                // Insert user
+                // Insert user (default classification is 'user')
                 using var insertCmd = new MySqlCommand(
-                    "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review)",
+                    "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review, classification) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review, 'user')",
                     connection);
                 insertCmd.Parameters.AddWithValue("@email", request.Email);
                 insertCmd.Parameters.AddWithValue("@password_hash", passwordHash);
@@ -165,6 +165,67 @@ namespace MIS321_GroupProject3_Team2.Controllers
             }
         }
 
+        [HttpPost("admin/login")]
+        public async Task<IActionResult> AdminLogin([FromBody] AdminLoginRequest request)
+        {
+            try
+            {
+                var connString = ParseConnectionString(_connectionString);
+
+                using var connection = new MySqlConnection(connString);
+                await connection.OpenAsync();
+
+                // Get user by email
+                using var userCmd = new MySqlCommand(
+                    "SELECT id, email, classification, is_verified FROM users WHERE email = @email",
+                    connection);
+                userCmd.Parameters.AddWithValue("@email", request.Email);
+                
+                using var reader = await userCmd.ExecuteReaderAsync();
+                if (!reader.Read())
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                var idOrd = reader.GetOrdinal("id");
+                var emailOrd = reader.GetOrdinal("email");
+                var classificationOrd = reader.GetOrdinal("classification");
+                var verifiedOrd = reader.GetOrdinal("is_verified");
+
+                var userId = reader.GetInt32(idOrd);
+                var email = reader.GetString(emailOrd);
+                var classification = reader.IsDBNull(classificationOrd) ? "user" : reader.GetString(classificationOrd);
+                var isVerified = reader.GetBoolean(verifiedOrd);
+                reader.Close();
+
+                // Check if user is admin
+                if (classification != "admin")
+                {
+                    return StatusCode(403, new { message = "Access denied. Admin privileges required." });
+                }
+
+                // For admin login, verify account is verified
+                if (!isVerified)
+                {
+                    return BadRequest(new { message = "Admin account not verified" });
+                }
+
+                // Admin can login with just email (no password required)
+                // In production, you might want to add additional verification like MFA
+
+                return Ok(new { 
+                    verified = true, 
+                    userId = userId,
+                    email = email,
+                    classification = classification
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         private static string HashPassword(string password)
         {
             using var sha256 = SHA256.Create();
@@ -212,6 +273,12 @@ namespace MIS321_GroupProject3_Team2.Controllers
     {
         public string Email { get; set; } = "";
         public string Code { get; set; } = "";
+    }
+
+    public class AdminLoginRequest
+    {
+        public string Email { get; set; } = "";
+        public string? PassportCode { get; set; }
     }
 }
 

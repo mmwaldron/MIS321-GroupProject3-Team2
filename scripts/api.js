@@ -227,6 +227,14 @@ const API = {
     });
   },
 
+  // Admin login
+  async adminLogin(email) {
+    return await this.request('/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  },
+
   // NVD ingestion
   async triggerNvdIngest() {
     return await this.request('/nvd/ingest', {
