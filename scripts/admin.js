@@ -183,10 +183,10 @@ async function approveCase() {
     // Approve verification via API
     const result = await API.approveVerification(currentCaseId, adminNotes);
     
-    // Show passport code to admin
+    // Show passport code and QR code to admin
     if (result.passportCode) {
-      document.getElementById('passportCodeDisplay').textContent = result.passportCode;
-      alert(`Verification approved!\n\nPassport Code: ${result.passportCode}\n\nShare this code with the user to access their passport.`);
+      displayPassportQR(result.passportCode, result.qrCodeBase64);
+      showPassportModal(result.passportCode, result.qrCodeBase64);
     }
 
     // Refresh dashboard
@@ -194,7 +194,7 @@ async function approveCase() {
     await updateStats();
     await displayCases();
 
-    // Close modal
+    // Close case modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('caseModal'));
     modal.hide();
 
@@ -203,6 +203,85 @@ async function approveCase() {
     console.error('Failed to approve case:', error);
     showAlert('Failed to approve verification. Please try again.', 'danger');
   }
+}
+
+function displayPassportQR(code, qrBase64) {
+  const passportDisplay = document.getElementById('passportCodeDisplay');
+  if (passportDisplay) {
+    passportDisplay.innerHTML = `
+      <div class="d-flex flex-column align-items-center">
+        <code style="font-family: 'Courier New', monospace; color: var(--primary-green); font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;">${code}</code>
+        ${qrBase64 ? `<img src="data:image/png;base64,${qrBase64}" alt="QR Code" style="max-width: 200px; border: 2px solid var(--primary-green); padding: 10px; background: white;" />` : ''}
+      </div>
+    `;
+  }
+}
+
+function showPassportModal(code, qrBase64) {
+  let modal = document.getElementById('passportModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'passportModal';
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-success">
+          <div class="modal-header border-success">
+            <h5 class="modal-title text-success">Passport Generated</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-center">
+            <p class="text-light mb-3">Share this passport code with the user:</p>
+            <code id="modalPassportCode" class="bg-dark text-success p-3 rounded d-block mb-3" style="font-size: 1.5rem; font-family: 'Courier New', monospace;">${code}</code>
+            <div id="modalQRCode" class="mb-3"></div>
+            <div class="d-flex gap-2 justify-content-center">
+              <button class="btn btn-success" onclick="downloadPassportQR('${code}', '${qrBase64 || ''}')">
+                <i class="bi bi-download"></i> Download QR Code
+              </button>
+              <button class="btn btn-outline-success" onclick="copyPassportCode('${code}')">
+                <i class="bi bi-clipboard"></i> Copy Code
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  } else {
+    document.getElementById('modalPassportCode').textContent = code;
+    const qrContainer = document.getElementById('modalQRCode');
+    if (qrContainer) {
+      qrContainer.innerHTML = qrBase64 
+        ? `<img src="data:image/png;base64,${qrBase64}" alt="QR Code" style="max-width: 250px; border: 2px solid var(--primary-green); padding: 10px; background: white;" />`
+        : '';
+    }
+  }
+  
+  const bsModal = new bootstrap.Modal(modal);
+  bsModal.show();
+}
+
+function downloadPassportQR(code, qrBase64) {
+  if (!qrBase64) {
+    showAlert('QR code not available for download', 'warning');
+    return;
+  }
+  
+  const link = document.createElement('a');
+  link.href = `data:image/png;base64,${qrBase64}`;
+  link.download = `passport-${code}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showAlert('QR code downloaded successfully!', 'success');
+}
+
+function copyPassportCode(code) {
+  navigator.clipboard.writeText(code).then(() => {
+    showAlert('Passport code copied to clipboard!', 'success');
+  }).catch(() => {
+    showAlert('Failed to copy code', 'danger');
+  });
 }
 
 async function denyCase() {
