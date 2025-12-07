@@ -199,32 +199,11 @@ async function checkUserStatus() {
     if (!statusBanner || !pendingCard || !approvedCard) return;
 
     if (user.verified) {
-      // User is approved - show approved status and try to get passport code
+      // User is approved - show approved status
       statusBanner.style.display = 'block';
       pendingCard.style.display = 'none';
       approvedCard.style.display = 'block';
-      
-      // Try to get passport code
-      try {
-        const response = await API.getUserPassportCode(userId);
-        if (response && response.code) {
-          const passportCode = response.code;
-          // Display passport code in the approved card
-          const passportCodeDisplay = document.getElementById('passportCodeDisplay');
-          if (passportCodeDisplay) {
-            passportCodeDisplay.textContent = passportCode;
-            passportCodeDisplay.style.display = 'inline-block';
-          }
-          
-          // Also update the passport code input if it exists
-          const passportCodeInput = document.getElementById('passportCodeInput');
-          if (passportCodeInput) {
-            passportCodeInput.value = passportCode;
-          }
-        }
-      } catch (error) {
-        console.error('Error getting passport code:', error);
-      }
+      // QR Passport will be provided by admin after approval
       
       localStorage.setItem('userStatus', 'approved');
     } else {
@@ -247,20 +226,28 @@ async function adminLogin(event) {
   event.preventDefault();
   
   const emailInput = document.getElementById('adminEmail');
-  if (!emailInput) {
-    showAlert('Admin email input not found.', 'danger');
+  const passwordInput = document.getElementById('adminPassword');
+  
+  if (!emailInput || !passwordInput) {
+    showAlert('Admin login form not found.', 'danger');
     return;
   }
   
   const email = emailInput.value.trim();
+  const password = passwordInput.value;
   
   if (!email) {
     showAlert('Please enter an admin email address.', 'danger');
     return;
   }
   
+  if (!password) {
+    showAlert('Please enter your password.', 'danger');
+    return;
+  }
+  
   try {
-    const result = await API.adminLogin(email);
+    const result = await API.adminLogin(email, password);
     
     if (result && result.verified && result.classification === 'admin') {
       // Store admin session
@@ -286,8 +273,8 @@ function logout() {
   localStorage.removeItem('currentPassportCode');
   localStorage.removeItem('currentUserEmail');
   localStorage.removeItem('userStatus');
-  localStorage.removeItem('verificationId');
   localStorage.removeItem('userClassification');
+  localStorage.removeItem('verificationId');
   
   // Redirect to login/verification page
   window.location.href = 'index.html';

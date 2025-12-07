@@ -29,6 +29,10 @@ var connectionString = configConn
 builder.Services.AddSingleton<MIS321_GroupProject3_Team2.Services.NvdIngestService>(
     sp => new MIS321_GroupProject3_Team2.Services.NvdIngestService(connectionString));
 
+// Register QR Auth Service
+builder.Services.AddSingleton<MIS321_GroupProject3_Team2.Services.QrAuthService>(
+    sp => new MIS321_GroupProject3_Team2.Services.QrAuthService(builder.Configuration));
+
 builder.Services.AddControllers();
 
 builder.Services.AddCors(options => 

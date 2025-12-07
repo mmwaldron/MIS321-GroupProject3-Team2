@@ -575,7 +575,7 @@ function displayPendingApprovalResult(userId, verificationId) {
   resultMessage.innerHTML = `
     <p>Your account has been created and is pending admin approval.</p>
     <p class="mb-0">You are logged in, but access to the portal is restricted until your account is approved.</p>
-    <p class="mt-2 mb-0"><strong>Once approved, you will receive your 10-digit passport code here.</strong></p>
+    <p class="mt-2 mb-0"><strong>Once approved, you will receive your QR Passport from the admin.</strong></p>
   `;
   resultActions.innerHTML = `
     <button class="btn btn-success" onclick="window.location.href='dashboard.html'">
@@ -602,7 +602,7 @@ function displayVerificationResult(user, verification, riskAssessment) {
   resultIcon.innerHTML = '<i class="bi bi-hourglass-split text-warning" style="font-size: 4rem;"></i>';
   resultTitle.textContent = 'Under Review';
   resultTitle.className = 'mb-3 text-warning';
-  resultMessage.textContent = 'Your verification is under review by our security team. Once approved, you will receive a 10-digit passport code to access your BioTrust Passport.';
+  resultMessage.textContent = 'Your verification is under review by our security team. Once approved, you will receive a QR Passport code to access your account.';
   resultActions.innerHTML = `
     <button class="btn btn-outline-success" onclick="window.location.reload()">
       Check Status Later

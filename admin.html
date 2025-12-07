@@ -41,10 +41,12 @@
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
             <li class="nav-item">
-              <a class="nav-link" href="index.html">Verification</a>
+              <a class="nav-link active" href="admin.html">Admin</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link active" href="admin.html">Admin</a>
+              <button class="btn btn-outline-danger btn-sm ms-2" onclick="logout()">
+                <i class="bi bi-box-arrow-right"></i> Logout
+              </button>
             </li>
           </ul>
         </div>
@@ -180,7 +182,7 @@
                   <th>Urgency</th>
                   <th>Credibility</th>
                   <th>Trust Score</th>
-                  <th>Passport Code</th>
+                  <th>QR Passport</th>
                   <th>Date</th>
                   <th>Actions</th>
                 </tr>
@@ -230,7 +232,7 @@
               Deny
             </button>
             <button type="button" class="btn btn-success" id="approveBtn" onclick="approveCase()">
-              Approve
+              <i class="bi bi-check-circle"></i> Approve
             </button>
           </div>
         </div>
@@ -250,10 +252,24 @@
     <!-- Custom JS -->
     <script src="./scripts/apiConfig.js"></script>
     <script src="./scripts/api.js"></script>
+    <script src="./scripts/main.js"></script>
     <script src="./scripts/riskFilter.js"></script>
     <script src="./scripts/trustScore.js"></script>
     <script src="./scripts/messaging.js"></script>
     <script src="./scripts/admin.js"></script>
+    <script>
+      // Check if user is admin on page load
+      (function() {
+        const userId = localStorage.getItem('currentUserId');
+        const userClassification = localStorage.getItem('userClassification');
+        
+        if (!userId || userClassification !== 'admin') {
+          // Not logged in as admin, redirect to index
+          localStorage.clear();
+          window.location.replace('index.html');
+        }
+      })();
+    </script>
   </body>
 </html>
 

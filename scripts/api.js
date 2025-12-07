@@ -228,24 +228,19 @@ const API = {
     });
   },
 
-  // Get user's passport code
-  async getUserPassportCode(userId) {
-    return await this.request(`/passport/user/${userId}`);
-  },
-
-  // Verify QR code (from uploaded QR image)
-  async verifyQRCode(code) {
-    return await this.request('/passport/verify-qr-code', {
+  // Generate QR code for user (admin only)
+  async generateQr(userId) {
+    return await this.request('/generate-qr', {
       method: 'POST',
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ userId })
     });
   },
 
   // Admin login
-  async adminLogin(email) {
+  async adminLogin(email, password) {
     return await this.request('/auth/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email, password })
     });
   },
 

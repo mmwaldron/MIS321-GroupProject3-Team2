@@ -418,7 +418,7 @@ async function loadProfile() {
     const userIdEl = document.getElementById('profileUserId');
     const statusEl = document.getElementById('profileStatus');
     const createdAtEl = document.getElementById('profileCreatedAt');
-    const passportCodeEl = document.getElementById('profilePassportCode');
+    // Passport code section removed - using QR login instead
     const passportCodeSection = document.getElementById('passportCodeSection');
 
     if (emailEl) emailEl.textContent = user.email || '-';
@@ -439,21 +439,8 @@ async function loadProfile() {
       createdAtEl.textContent = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     }
 
-    // Try to get passport code if user is verified
-    if (user.verified && passportCodeEl && passportCodeSection) {
-      try {
-        const passportResponse = await API.getUserPassportCode(userId);
-        if (passportResponse && passportResponse.code) {
-          passportCodeEl.textContent = passportResponse.code;
-          passportCodeSection.style.display = 'block';
-        } else {
-          passportCodeSection.style.display = 'none';
-        }
-      } catch (error) {
-        console.error('Error fetching passport code:', error);
-        passportCodeSection.style.display = 'none';
-      }
-    } else if (passportCodeSection) {
+    // Hide passport code section (replaced with QR login)
+    if (passportCodeSection) {
       passportCodeSection.style.display = 'none';
     }
 

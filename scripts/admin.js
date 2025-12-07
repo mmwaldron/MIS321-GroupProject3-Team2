@@ -69,7 +69,7 @@ async function displayCases() {
     const passportDisplay = '<span class="text-muted">Check details</span>';
 
     return `
-      <tr class="case-row" data-case-id="${v.id}" onclick="viewCase('${v.id}')">
+      <tr class="case-row" data-case-id="${v.id}">
         <td>
           <div class="fw-bold">${v.name || 'Unknown'}</div>
           <small class="text-muted">${v.email || ''}</small>
@@ -82,13 +82,38 @@ async function displayCases() {
         <td>${passportDisplay}</td>
         <td><small>${v.createdAt ? new Date(v.createdAt).toLocaleDateString() : 'N/A'}</small></td>
         <td>
-          <button class="btn btn-sm btn-outline-success" onclick="event.stopPropagation(); viewCase('${v.id}')">
+          <button class="btn btn-sm btn-outline-success view-case-btn" data-case-id="${v.id}" type="button">
             <i class="bi bi-eye"></i>
           </button>
         </td>
       </tr>
     `;
   }).join('');
+
+  // Attach event listeners to view buttons
+  tbody.querySelectorAll('.view-case-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const caseId = this.getAttribute('data-case-id');
+      if (caseId) {
+        viewCase(caseId);
+      }
+    });
+  });
+
+  // Attach event listeners to table rows
+  tbody.querySelectorAll('.case-row').forEach(row => {
+    row.addEventListener('click', function(e) {
+      // Don't trigger if clicking on the button
+      if (e.target.closest('.view-case-btn')) {
+        return;
+      }
+      const caseId = this.getAttribute('data-case-id');
+      if (caseId) {
+        viewCase(caseId);
+      }
+    });
+  });
 }
 
 function getStatusBadge(status) {
@@ -149,15 +174,35 @@ async function viewCase(caseId) {
           <p><strong>Urgency:</strong> ${verification.urgency}</p>
           <p><strong>Credibility:</strong> ${verification.credibility}</p>
           <p><strong>Trust Score:</strong> ${verification.trustScore || 0}</p>
-          <p><strong>Passport Code:</strong> <span style="font-family: 'Courier New', monospace; color: var(--primary-green); font-weight: bold; font-size: 1.1rem;" id="passportCodeDisplay">Not issued</span></p>
+          <div id="qrCodeSection" style="display: none;">
+            <p><strong>QR Passport:</strong></p>
+            <div class="mb-2 text-center">
+              <img id="qrCodeImage" src="" alt="QR Code" class="img-fluid border border-success rounded" style="max-width: 250px; max-height: 250px;" />
+            </div>
+            <div class="text-center">
+              <button class="btn btn-success" onclick="downloadQrCode()">
+                <i class="bi bi-download"></i> Download QR Code
+              </button>
+            </div>
+            <small class="text-muted d-block mt-2 text-center">
+              Share this QR code with the user for login access
+            </small>
+          </div>
         </div>
         <div class="col-12 mb-3">
           <h6 class="text-success">Risk Factors</h6>
           <pre class="bg-dark p-3 border border-success rounded">${JSON.stringify(verification.factors || {}, null, 2)}</pre>
         </div>
-        <div class="col-12">
+        <div class="col-12 mb-3">
           <h6 class="text-success">Admin Notes</h6>
           <textarea class="form-control bg-dark text-light border-success" id="adminNotes" rows="3"></textarea>
+        </div>
+        <div class="col-12">
+          ${verification.status === 'approved' ? '' : `
+          <button class="btn btn-outline-success" onclick="generateQrForUser(${verification.userId})" id="generateQrBtn">
+            <i class="bi bi-qr-code"></i> Generate QR Passport
+          </button>
+          `}
         </div>
       </div>
     `;
@@ -166,6 +211,14 @@ async function viewCase(caseId) {
     if (verification.status === 'pending') {
       approveBtn.style.display = 'inline-block';
       denyBtn.style.display = 'inline-block';
+    } else if (verification.status === 'approved') {
+      // If already approved, hide approve/deny buttons and show QR if available
+      approveBtn.style.display = 'none';
+      denyBtn.style.display = 'none';
+      // Try to get QR code if user is already approved (but don't show error if it fails)
+      generateQrForUser(verification.userId).catch(err => {
+        console.log('QR code not yet generated for this user');
+      });
     } else {
       approveBtn.style.display = 'none';
       denyBtn.style.display = 'none';
@@ -184,29 +237,81 @@ async function approveCase() {
 
   try {
     const adminNotes = document.getElementById('adminNotes')?.value || '';
+    const approveBtn = document.getElementById('approveBtn');
+    const denyBtn = document.getElementById('denyBtn');
+
+    // Disable buttons during approval
+    if (approveBtn) approveBtn.disabled = true;
+    if (denyBtn) denyBtn.disabled = true;
 
     // Approve verification via API
     const result = await API.approveVerification(currentCaseId, adminNotes);
     
-    // Show passport code to admin
-    if (result.passportCode) {
-      document.getElementById('passportCodeDisplay').textContent = result.passportCode;
-      alert(`Verification approved!\n\nPassport Code: ${result.passportCode}\n\nShare this code with the user to access their passport.`);
+    // Show QR code to admin in the modal
+    if (result.qrCodeBase64) {
+      const qrSection = document.getElementById('qrCodeSection');
+      const qrImage = document.getElementById('qrCodeImage');
+      const generateQrBtn = document.getElementById('generateQrBtn');
+      
+      if (qrSection && qrImage) {
+        qrImage.src = `data:image/png;base64,${result.qrCodeBase64}`;
+        qrSection.style.display = 'block';
+        // Store QR data for download
+        window.currentQrCodeBase64 = result.qrCodeBase64;
+        window.currentQrUserId = result.userId;
+        
+        // Hide the generate QR button since we already have one
+        if (generateQrBtn) {
+          generateQrBtn.style.display = 'none';
+        }
+      }
+      
+      // Update status badge in modal
+      const statusBadge = document.querySelector('#caseModalBody .col-md-6:last-child p:first-child');
+      if (statusBadge) {
+        statusBadge.innerHTML = `<strong>Status:</strong> ${getStatusBadge('approved')}`;
+      }
+      
+      // Hide approve/deny buttons and show success message
+      if (approveBtn) {
+        approveBtn.style.display = 'none';
+        approveBtn.disabled = false;
+      }
+      if (denyBtn) {
+        denyBtn.style.display = 'none';
+        denyBtn.disabled = false;
+      }
+      
+      // Show success alert in modal
+      const modalBody = document.getElementById('caseModalBody');
+      if (modalBody) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show';
+        alertDiv.innerHTML = `
+          <strong>Verification Approved!</strong> QR Passport generated successfully. Download and share the QR code with the user.
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        `;
+        modalBody.insertBefore(alertDiv, modalBody.firstChild);
+      }
+    } else {
+      showAlert('Verification approved, but QR code generation failed. Please try generating QR code manually.', 'warning');
     }
 
-    // Refresh dashboard
+    // Refresh dashboard data (but keep modal open)
     allVerifications = await API.getVerifications();
     await updateStats();
     await displayCases();
 
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('caseModal'));
-    modal.hide();
-
-    showAlert('Verification approved successfully.', 'success');
+    showAlert('Verification approved successfully. QR code is displayed in the modal.', 'success');
   } catch (error) {
     console.error('Failed to approve case:', error);
     showAlert('Failed to approve verification. Please try again.', 'danger');
+    
+    // Re-enable buttons on error
+    const approveBtn = document.getElementById('approveBtn');
+    const denyBtn = document.getElementById('denyBtn');
+    if (approveBtn) approveBtn.disabled = false;
+    if (denyBtn) denyBtn.disabled = false;
   }
 }
 
@@ -298,7 +403,7 @@ async function applyFilters() {
     const passportDisplay = '<span class="text-muted">Check details</span>';
 
     return `
-      <tr class="case-row" data-case-id="${v.id}" onclick="viewCase('${v.id}')">
+      <tr class="case-row" data-case-id="${v.id}">
         <td>
           <div class="fw-bold">${v.name || 'Unknown'}</div>
           <small class="text-muted">${v.email || ''}</small>
@@ -311,13 +416,38 @@ async function applyFilters() {
         <td>${passportDisplay}</td>
         <td><small>${v.createdAt ? new Date(v.createdAt).toLocaleDateString() : 'N/A'}</small></td>
         <td>
-          <button class="btn btn-sm btn-outline-success" onclick="event.stopPropagation(); viewCase('${v.id}')">
+          <button class="btn btn-sm btn-outline-success view-case-btn" data-case-id="${v.id}" type="button">
             <i class="bi bi-eye"></i>
           </button>
         </td>
       </tr>
     `;
   }).join('');
+
+  // Attach event listeners to view buttons
+  tbody.querySelectorAll('.view-case-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const caseId = this.getAttribute('data-case-id');
+      if (caseId) {
+        viewCase(caseId);
+      }
+    });
+  });
+
+  // Attach event listeners to table rows
+  tbody.querySelectorAll('.case-row').forEach(row => {
+    row.addEventListener('click', function(e) {
+      // Don't trigger if clicking on the button
+      if (e.target.closest('.view-case-btn')) {
+        return;
+      }
+      const caseId = this.getAttribute('data-case-id');
+      if (caseId) {
+        viewCase(caseId);
+      }
+    });
+  });
 }
 
 async function loadMessages() {
@@ -394,14 +524,106 @@ async function checkAlerts() {
   }
 }
 
-// Generate 10-digit passport code
-function generatePassportCode() {
-  // Generate random 10-digit code
-  let code = '';
-  for (let i = 0; i < 10; i++) {
-    code += Math.floor(Math.random() * 10).toString();
+// Download QR code
+function downloadQrCode() {
+  const qrBase64 = window.currentQrCodeBase64;
+  if (!qrBase64) {
+    // Show alert in modal if available
+    const modalBody = document.getElementById('caseModalBody');
+    if (modalBody) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+      alertDiv.innerHTML = `
+        No QR code available to download. Please approve the user first.
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+      `;
+      modalBody.insertBefore(alertDiv, modalBody.firstChild);
+    } else {
+      showAlert('No QR code available to download.', 'warning');
+    }
+    return;
   }
-  return code;
+
+  // Create download link
+  const link = document.createElement('a');
+  link.href = `data:image/png;base64,${qrBase64}`;
+  link.download = `biotrust-passport-${window.currentQrUserId || 'qr'}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  // Show success message in modal
+  const modalBody = document.getElementById('caseModalBody');
+  if (modalBody) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show';
+    alertDiv.innerHTML = `
+      QR code downloaded successfully!
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+    `;
+    modalBody.insertBefore(alertDiv, modalBody.firstChild);
+  }
+}
+
+// Generate QR code for a user (admin only)
+async function generateQrForUser(userId) {
+  try {
+    const generateQrBtn = document.getElementById('generateQrBtn');
+    if (generateQrBtn) {
+      generateQrBtn.disabled = true;
+      generateQrBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+    }
+
+    const result = await API.generateQr(userId);
+    
+    if (result.qrCodeBase64) {
+      const qrSection = document.getElementById('qrCodeSection');
+      const qrImage = document.getElementById('qrCodeImage');
+      if (qrSection && qrImage) {
+        qrImage.src = `data:image/png;base64,${result.qrCodeBase64}`;
+        qrSection.style.display = 'block';
+        window.currentQrCodeBase64 = result.qrCodeBase64;
+        window.currentQrUserId = result.userId;
+        
+        // Hide the generate button since we have a QR code now
+        if (generateQrBtn) {
+          generateQrBtn.style.display = 'none';
+        }
+        
+        // Show success message in modal
+        const modalBody = document.getElementById('caseModalBody');
+        if (modalBody) {
+          const alertDiv = document.createElement('div');
+          alertDiv.className = 'alert alert-success alert-dismissible fade show';
+          alertDiv.innerHTML = `
+            QR Passport generated successfully! Download and share with the user.
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+          `;
+          modalBody.insertBefore(alertDiv, modalBody.firstChild);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to generate QR code:', error);
+    const modalBody = document.getElementById('caseModalBody');
+    if (modalBody) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+      alertDiv.innerHTML = `
+        Failed to generate QR code: ${error.message || 'Please try again.'}
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+      `;
+      modalBody.insertBefore(alertDiv, modalBody.firstChild);
+    } else {
+      showAlert('Failed to generate QR code. Please try again.', 'danger');
+    }
+  } finally {
+    const generateQrBtn = document.getElementById('generateQrBtn');
+    if (generateQrBtn) {
+      generateQrBtn.disabled = false;
+      generateQrBtn.innerHTML = '<i class="bi bi-qr-code"></i> Generate QR Passport';
+    }
+  }
 }
 
 // Initialize on load

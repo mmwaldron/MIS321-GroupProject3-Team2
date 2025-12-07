@@ -177,7 +177,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
 
                 // Get user by email
                 using var userCmd = new MySqlCommand(
-                    "SELECT id, email, classification, is_verified FROM users WHERE email = @email",
+                    "SELECT id, email, password_hash, classification, is_verified FROM users WHERE email = @email",
                     connection);
                 userCmd.Parameters.AddWithValue("@email", request.Email);
                 
@@ -189,11 +189,13 @@ namespace MIS321_GroupProject3_Team2.Controllers
 
                 var idOrd = reader.GetOrdinal("id");
                 var emailOrd = reader.GetOrdinal("email");
+                var passwordHashOrd = reader.GetOrdinal("password_hash");
                 var classificationOrd = reader.GetOrdinal("classification");
                 var verifiedOrd = reader.GetOrdinal("is_verified");
 
                 var userId = reader.GetInt32(idOrd);
                 var email = reader.GetString(emailOrd);
+                var passwordHash = reader.IsDBNull(passwordHashOrd) ? null : reader.GetString(passwordHashOrd);
                 var classification = reader.IsDBNull(classificationOrd) ? "user" : reader.GetString(classificationOrd);
                 var isVerified = reader.GetBoolean(verifiedOrd);
                 reader.Close();
@@ -210,8 +212,17 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     return BadRequest(new { message = "Admin account not verified" });
                 }
 
-                // Admin can login with just email (no password required)
-                // In production, you might want to add additional verification like MFA
+                // Verify password
+                if (string.IsNullOrEmpty(passwordHash))
+                {
+                    return BadRequest(new { message = "Admin account does not have a password set" });
+                }
+
+                var hashedPassword = HashPassword(request.Password);
+                if (passwordHash != hashedPassword)
+                {
+                    return Unauthorized(new { message = "Invalid password" });
+                }
 
                 return Ok(new { 
                     verified = true, 
@@ -278,7 +289,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
     public class AdminLoginRequest
     {
         public string Email { get; set; } = "";
-        public string? PassportCode { get; set; }
+        public string Password { get; set; } = "";
     }
 }
 

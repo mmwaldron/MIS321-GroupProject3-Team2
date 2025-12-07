@@ -1,30 +1,30 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\tasta\\Downloads\\MIS321-GroupProject3-Team2\\api\\MIS321-GroupProject3-Team2.csproj": {}
+    "/Users/mollywaldron/Documents/MIS321/groupproject3/MIS321-GroupProject3-Team2/api/MIS321-GroupProject3-Team2.csproj": {}
   },
   "projects": {
-    "C:\\Users\\tasta\\Downloads\\MIS321-GroupProject3-Team2\\api\\MIS321-GroupProject3-Team2.csproj": {
+    "/Users/mollywaldron/Documents/MIS321/groupproject3/MIS321-GroupProject3-Team2/api/MIS321-GroupProject3-Team2.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\tasta\\Downloads\\MIS321-GroupProject3-Team2\\api\\MIS321-GroupProject3-Team2.csproj",
+        "projectUniqueName": "/Users/mollywaldron/Documents/MIS321/groupproject3/MIS321-GroupProject3-Team2/api/MIS321-GroupProject3-Team2.csproj",
         "projectName": "MIS321-GroupProject3-Team2",
-        "projectPath": "C:\\Users\\tasta\\Downloads\\MIS321-GroupProject3-Team2\\api\\MIS321-GroupProject3-Team2.csproj",
-        "packagesPath": "C:\\Users\\tasta\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\tasta\\Downloads\\MIS321-GroupProject3-Team2\\api\\obj\\",
+        "projectPath": "/Users/mollywaldron/Documents/MIS321/groupproject3/MIS321-GroupProject3-Team2/api/MIS321-GroupProject3-Team2.csproj",
+        "packagesPath": "/Users/mollywaldron/.nuget/packages/",
+        "outputPath": "/Users/mollywaldron/Documents/MIS321/groupproject3/MIS321-GroupProject3-Team2/api/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\tasta\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "/Users/mollywaldron/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net9.0"
         ],
         "sources": {
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
+          "net9.0": {
+            "targetAlias": "net9.0",
             "projectReferences": {}
           }
         },
@@ -37,11 +37,12 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        }
+        },
+        "SdkAnalysisLevel": "9.0.100"
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net9.0": {
+          "targetAlias": "net9.0",
           "dependencies": {
             "MySqlConnector": {
               "target": "Package",
@@ -50,6 +51,18 @@
             "QRCoder": {
               "target": "Package",
               "version": "[1.6.0, )"
+            },
+            "SixLabors.ImageSharp": {
+              "target": "Package",
+              "version": "[1.0.4, )"
+            },
+            "ZXing.Net": {
+              "target": "Package",
+              "version": "[0.16.9, )"
+            },
+            "ZXing.Net.Bindings.ImageSharp": {
+              "target": "Package",
+              "version": "[0.16.9, )"
             }
           },
           "imports": [
@@ -71,7 +84,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.405/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.102/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

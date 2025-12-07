@@ -41,13 +41,7 @@
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
             <li class="nav-item">
-              <a class="nav-link" href="dashboard.html">Dashboard</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="index.html">Verification</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="admin.html">Admin</a>
+              <a class="nav-link active" href="index.html">Home</a>
             </li>
           </ul>
         </div>
@@ -56,76 +50,115 @@
 
     <!-- Main Container -->
     <div class="container my-5">
-      <!-- User Status Banner (if logged in) -->
-      <div class="row justify-content-center mb-4" id="userStatusBanner" style="display: none;">
-        <div class="col-lg-8">
-          <div class="card border-warning" id="pendingStatusCard">
-            <div class="card-body p-4">
-              <div class="d-flex align-items-center">
-                <i class="bi bi-hourglass-split text-warning me-3" style="font-size: 2rem;"></i>
-                <div class="flex-grow-1">
-                  <h5 class="mb-1 text-warning">Account Pending Approval</h5>
-                  <p class="text-muted mb-0">Your account is pending admin approval. You are logged in, but access is restricted until approved.</p>
-                </div>
-                <button class="btn btn-outline-warning" onclick="checkAccountStatus()">Check Status</button>
-              </div>
-            </div>
-          </div>
-          <div class="card border-success" id="approvedStatusCard" style="display: none;">
-            <div class="card-body p-4">
-              <div class="d-flex align-items-center">
-                <i class="bi bi-check-circle text-success me-3" style="font-size: 2rem;"></i>
-                <div class="flex-grow-1">
-                  <h5 class="mb-1 text-success">Account Approved</h5>
-                  <p class="text-muted mb-2">Your account has been approved! Your passport code is:</p>
-                  <div class="mt-2">
-                    <code id="passportCodeDisplay" class="bg-dark text-success p-2 rounded" style="font-size: 1.25rem; font-family: 'Courier New', monospace; display: none;"></code>
+      <!-- Tabs Navigation -->
+      <ul class="nav nav-tabs mb-4 justify-content-center" id="mainTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link active"
+            id="login-tab"
+            data-bs-toggle="tab"
+            data-bs-target="#login-pane"
+            type="button"
+            role="tab"
+            aria-controls="login-pane"
+            aria-selected="true"
+          >
+            <i class="bi bi-box-arrow-in-right"></i> Login
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="verify-tab"
+            data-bs-toggle="tab"
+            data-bs-target="#verify-pane"
+            type="button"
+            role="tab"
+            aria-controls="verify-pane"
+            aria-selected="false"
+          >
+            <i class="bi bi-shield-check"></i> Get Verified
+          </button>
+        </li>
+      </ul>
+
+      <!-- Tab Content -->
+      <div class="tab-content" id="mainTabContent">
+        <!-- Login Tab -->
+        <div
+          class="tab-pane fade show active"
+          id="login-pane"
+          role="tabpanel"
+          aria-labelledby="login-tab"
+        >
+          <div class="row justify-content-center">
+            <div class="col-lg-8">
+              <!-- QR Code Login -->
+              <div class="card mb-4">
+                <div class="card-body p-4">
+                  <div class="text-center mb-3">
+                    <i class="bi bi-qr-code-scan text-success" style="font-size: 2.5rem;"></i>
+                    <h4 class="mt-2 mb-1 text-success">QR Code Login</h4>
+                    <p class="text-muted mb-0">Login using your QR Passport code</p>
                   </div>
+                  <div class="text-center">
+                    <a href="qr-login.html" class="btn btn-success btn-lg">
+                      <i class="bi bi-qr-code-scan"></i> Login with QR Code
+                    </a>
+                  </div>
+                  <small class="text-muted d-block mt-3 text-center">
+                    <i class="bi bi-info-circle"></i> You will receive your QR Passport after admin approval
+                  </small>
+                </div>
+              </div>
+
+              <!-- Admin Login -->
+              <div class="card">
+                <div class="card-body p-4">
+                  <div class="text-center mb-3">
+                    <i class="bi bi-shield-lock text-success" style="font-size: 2.5rem;"></i>
+                    <h4 class="mt-2 mb-1 text-success">Admin Login</h4>
+                    <p class="text-muted mb-0">Administrator access only</p>
+                  </div>
+                  <form id="adminLoginForm" onsubmit="adminLogin(event)">
+                    <div class="mb-3">
+                      <label class="form-label">Email</label>
+                      <input
+                        type="email"
+                        class="form-control bg-dark text-light border-success"
+                        id="adminEmail"
+                        placeholder="admin@email.com"
+                        required
+                      />
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Password</label>
+                      <input
+                        type="password"
+                        class="form-control bg-dark text-light border-success"
+                        id="adminPassword"
+                        placeholder="Enter password"
+                        required
+                      />
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                      <i class="bi bi-box-arrow-in-right"></i> Login as Admin
+                    </button>
+                  </form>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Passport Code Lookup -->
-      <div class="row justify-content-center mb-4">
-        <div class="col-lg-8">
-          <div class="card">
-            <div class="card-body p-4">
-              <div class="text-center mb-3">
-                <i class="bi bi-passport text-success" style="font-size: 2.5rem;"></i>
-                <h4 class="mt-2 mb-1 text-success">Access Your Passport</h4>
-                <p class="text-muted mb-0">Enter your 10-digit passport code to view your BioTrust Passport</p>
-              </div>
-              <form id="passportCodeForm" onsubmit="lookupPassport(event)">
-                <div class="input-group input-group-lg">
-                  <input
-                    type="text"
-                    class="form-control bg-dark text-light border-success text-center"
-                    id="passportCodeInput"
-                    placeholder="0000000000"
-                    maxlength="10"
-                    pattern="[0-9]{10}"
-                    required
-                    inputmode="numeric"
-                    style="font-size: 1.5rem; letter-spacing: 0.5rem; font-family: 'Courier New', monospace;"
-                    oninput="formatPassportCode(this)"
-                  />
-                  <button class="btn btn-success" type="submit">
-                    <i class="bi bi-arrow-right"></i> Access
-                  </button>
-                </div>
-                <small class="text-muted d-block mt-2 text-center">
-                  <i class="bi bi-info-circle"></i> You will receive your passport code after admin approval
-                </small>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Verification Section -->
+        <!-- Get Verified Tab -->
+        <div
+          class="tab-pane fade"
+          id="verify-pane"
+          role="tabpanel"
+          aria-labelledby="verify-tab"
+        >
+          <!-- Verification Section -->
       <div class="row justify-content-center">
         <div class="col-lg-8">
           <div class="card verification-card">
@@ -190,7 +223,7 @@
                   </h5>
                   <form id="credentialsForm">
                     <div class="mb-3">
-                      <label class="form-label">Government ID Number</label>
+                      <label class="form-label">Last 4 digits of your Social Security Number</label>
                       <input
                         type="text"
                         class="form-control bg-dark text-light border-success"
@@ -200,7 +233,7 @@
                       />
                     </div>
                     <div class="mb-3">
-                      <label class="form-label">Verification Document</label>
+                      <label class="form-label">Verification Document (Optional: Must be a government issued ID)</label>
                       <input
                         type="file"
                         class="form-control bg-dark text-light border-success"
@@ -210,7 +243,7 @@
                       <small class="text-muted">Upload ID or verification document</small>
                     </div>
                     <div class="mb-3">
-                      <label class="form-label">Company Email Address</label>
+                      <label class="form-label">Company Email Address (Optional: Must be a company email address)/label>
                       <input
                         type="email"
                         class="form-control bg-dark text-light border-success"
@@ -395,6 +428,8 @@
           </div>
         </div>
       </div>
+        </div>
+      </div>
     </div>
 
     <!-- Alert Notifications -->
@@ -416,12 +451,18 @@
     <script src="./scripts/riskFilter.js"></script>
     <script src="./scripts/trustScore.js"></script>
     <script>
-      // Redirect logged-in users to dashboard immediately (before other scripts load)
+      // Check if user is logged in and redirect appropriately
       (function() {
         const userId = localStorage.getItem('currentUserId');
+        const userClassification = localStorage.getItem('userClassification');
+        
         if (userId) {
-          // User is logged in, redirect to dashboard immediately
-          window.location.replace('dashboard.html');
+          // User is logged in, redirect based on classification
+          if (userClassification === 'admin') {
+            window.location.replace('admin.html');
+          } else {
+            window.location.replace('dashboard.html');
+          }
         }
       })();
     </script>

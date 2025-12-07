@@ -3,7 +3,7 @@ using MySqlConnector;
 using System.Text.Json;
 using System.Net.Mail;
 using System.Net;
-using QRCoder;
+using MIS321_GroupProject3_Team2.Services;
 
 namespace MIS321_GroupProject3_Team2.Controllers
 {
@@ -12,12 +12,14 @@ namespace MIS321_GroupProject3_Team2.Controllers
     public class VerificationController : ControllerBase
     {
         private readonly string _connectionString;
+        private readonly QrAuthService _qrAuthService;
         private static readonly Dictionary<string, EmailVerificationCode> _emailVerificationCodes = new();
         private static readonly object _codeLock = new();
         private static DateTime _lastCleanup = DateTime.UtcNow;
 
-        public VerificationController(IConfiguration configuration)
+        public VerificationController(IConfiguration configuration, QrAuthService qrAuthService)
         {
+            _qrAuthService = qrAuthService;
             var configConn = configuration.GetConnectionString("DefaultConnection");
             if (string.IsNullOrEmpty(configConn) || configConn == "${JAWSDB_URL}")
             {
@@ -461,16 +463,13 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 var reasonJson = reader.IsDBNull(reasonOrd) ? "{}" : reader.GetString(reasonOrd);
                 reader.Close();
 
-                // Generate 10-digit passport code
-                var passportCode = GeneratePassportCode();
-                var passportHash = HashPassportCode(passportCode);
+                // Generate signed QR payload (NOT stored in database)
+                var signedPayload = _qrAuthService.GenerateQrPayload(userId);
+                var qrImageBytes = _qrAuthService.GenerateQrCodeImage(signedPayload);
+                var qrCodeBase64 = Convert.ToBase64String(qrImageBytes);
 
-                // Generate QR code as base64 (NOT stored in database)
-                var qrCodeBase64 = GenerateQRCodeBase64(passportCode);
-
-                // Update verification status - DO NOT store passport code in reason field
+                // Update verification status
                 var reasonData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
-                // Removed: reasonData["passportCode"] = JsonSerializer.SerializeToElement(passportCode);
                 var updatedReason = JsonSerializer.Serialize(reasonData);
 
                 using var updateVerificationCmd = new MySqlCommand(
@@ -480,11 +479,10 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 updateVerificationCmd.Parameters.AddWithValue("@id", id);
                 await updateVerificationCmd.ExecuteNonQueryAsync();
 
-                // Update user
+                // Update user (remove passport_hash - no longer needed)
                 using var updateUserCmd = new MySqlCommand(
-                    "UPDATE users SET is_verified = TRUE, passport_hash = @passport_hash WHERE id = @user_id",
+                    "UPDATE users SET is_verified = TRUE WHERE id = @user_id",
                     connection);
-                updateUserCmd.Parameters.AddWithValue("@passport_hash", passportHash);
                 updateUserCmd.Parameters.AddWithValue("@user_id", userId);
                 await updateUserCmd.ExecuteNonQueryAsync();
 
@@ -505,9 +503,8 @@ namespace MIS321_GroupProject3_Team2.Controllers
 
                 return Ok(new { 
                     message = "Verification approved",
-                    passportCode = passportCode,
-                    passportHash = passportHash,
-                    qrCodeBase64 = qrCodeBase64
+                    qrCodeBase64 = qrCodeBase64,
+                    userId = userId
                 });
             }
             catch (Exception ex)
@@ -565,33 +562,6 @@ namespace MIS321_GroupProject3_Team2.Controllers
             }
         }
 
-        private static string GeneratePassportCode()
-        {
-            var random = new Random();
-            var code = "";
-            for (int i = 0; i < 10; i++)
-            {
-                code += random.Next(0, 10).ToString();
-            }
-            return code;
-        }
-
-        private static string HashPassportCode(string code)
-        {
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(code);
-            var hash = sha256.ComputeHash(bytes);
-            return Convert.ToBase64String(hash);
-        }
-
-        private static string GenerateQRCodeBase64(string code)
-        {
-            using var qrGenerator = new QRCodeGenerator();
-            var qrCodeData = qrGenerator.CreateQrCode(code, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new PngByteQRCode(qrCodeData);
-            var qrCodeBytes = qrCode.GetGraphic(20);
-            return Convert.ToBase64String(qrCodeBytes);
-        }
 
         [HttpPost("email/send")]
         public async Task<IActionResult> SendCompanyEmailVerification([FromBody] SendEmailVerificationRequest request)

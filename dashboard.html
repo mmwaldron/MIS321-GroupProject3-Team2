@@ -44,12 +44,6 @@
               <a class="nav-link active" href="dashboard.html">Dashboard</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="index.html">Verification</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="admin.html">Admin</a>
-            </li>
-            <li class="nav-item">
               <button class="btn btn-outline-danger btn-sm ms-2" onclick="logout()">
                 <i class="bi bi-box-arrow-right"></i> Logout
               </button>
@@ -173,7 +167,7 @@
               <div id="profileContent" style="display: none;">
                 <div class="card">
                   <div class="card-body">
-                    <h5 class="card-title">Account Information</h5>
+                    <h5 class="card-title account-info-title">Account Information</h5>
                     <hr>
                     <div class="mb-3">
                       <label class="form-label fw-bold text-light">Email</label>
@@ -193,13 +187,7 @@
                       <label class="form-label fw-bold text-light">Account Created</label>
                       <p class="text-white fw-semibold mb-0" id="profileCreatedAt" style="font-size: 1rem;">-</p>
                     </div>
-                    <div class="mb-3" id="passportCodeSection" style="display: none;">
-                      <label class="form-label fw-bold text-light">Passport Code</label>
-                      <p class="mb-2">
-                        <code id="profilePassportCode" class="text-success fw-bold" style="font-size: 1.25rem; font-family: 'Courier New', monospace; letter-spacing: 0.1em;">-</code>
-                      </p>
-                      <small class="text-light fw-normal" style="font-size: 0.9rem;">Your 10-digit BioTrust Passport code</small>
-                    </div>
+                    <!-- Passport code section removed - using QR login instead -->
                   </div>
                 </div>
               </div>
