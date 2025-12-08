@@ -126,41 +126,19 @@
         </div>
       </div>
 
-      <!-- Filters -->
+      <!-- Search -->
       <div class="card mb-4">
         <div class="card-body">
-          <div class="row g-3 align-items-end">
-            <div class="col-md-3">
-              <label class="form-label">Filter by Status</label>
-              <select class="form-select bg-dark text-light border-success" id="filterStatus">
-                <option value="pending" selected>Pending (Default)</option>
-                <option value="all">All Status</option>
-                <option value="approved">Approved</option>
-                <option value="denied">Denied</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Filter by Risk</label>
-              <select class="form-select bg-dark text-light border-success" id="filterRisk">
-                <option value="all">All Risk Levels</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Sort by</label>
-              <select class="form-select bg-dark text-light border-success" id="sortBy">
-                <option value="urgency">Urgency</option>
-                <option value="credibility">Credibility</option>
-                <option value="date">Date</option>
-                <option value="name">Name</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <button class="btn btn-success w-100" onclick="applyFilters()">
-                <i class="bi bi-funnel"></i> Apply Filters
-              </button>
+          <div class="row">
+            <div class="col-md-6">
+              <label class="form-label">Search by Name</label>
+              <input
+                type="text"
+                class="form-control bg-dark text-light border-success"
+                id="searchName"
+                placeholder="Enter name to search..."
+                oninput="applyFilters()"
+              />
             </div>
           </div>
         </div>
@@ -199,16 +177,6 @@
         </div>
       </div>
 
-      <!-- Messages Section -->
-      <div class="card mt-4">
-        <div class="card-header bg-dark border-success d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Messages</h5>
-          <span class="badge bg-success" id="messageCount">0</span>
-        </div>
-        <div class="card-body">
-          <div id="messagesList"></div>
-        </div>
-      </div>
     </div>
 
     <!-- Case Detail Modal -->
@@ -255,21 +223,7 @@
     <script src="./scripts/main.js"></script>
     <script src="./scripts/riskFilter.js"></script>
     <script src="./scripts/trustScore.js"></script>
-    <script src="./scripts/messaging.js"></script>
     <script src="./scripts/admin.js"></script>
-    <script>
-      // Check if user is admin on page load
-      (function() {
-        const userId = localStorage.getItem('currentUserId');
-        const userClassification = localStorage.getItem('userClassification');
-        
-        if (!userId || userClassification !== 'admin') {
-          // Not logged in as admin, redirect to index
-          localStorage.clear();
-          window.location.replace('index.html');
-        }
-      })();
-    </script>
   </body>
 </html>
 

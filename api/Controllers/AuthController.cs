@@ -45,18 +45,15 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     return BadRequest(new { message = "Email already registered" });
                 }
 
-                // Hash password
-                var passwordHash = HashPassword(request.Password);
-
                 // Generate MFA secret (simple 4-digit code for now)
                 var mfaSecret = GenerateMFASecret();
 
                 // Insert user (default classification is 'user')
+                // Note: password_hash column removed, users authenticate via QR codes
                 using var insertCmd = new MySqlCommand(
-                    "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review, classification) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review, 'user')",
+                    "INSERT INTO users (email, mfa_secret, is_verified, requires_review, classification) VALUES (@email, @mfa_secret, @is_verified, @requires_review, 'user')",
                     connection);
                 insertCmd.Parameters.AddWithValue("@email", request.Email);
-                insertCmd.Parameters.AddWithValue("@password_hash", passwordHash);
                 insertCmd.Parameters.AddWithValue("@mfa_secret", mfaSecret);
                 insertCmd.Parameters.AddWithValue("@is_verified", false);
                 insertCmd.Parameters.AddWithValue("@requires_review", false);
@@ -177,7 +174,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
 
                 // Get user by email
                 using var userCmd = new MySqlCommand(
-                    "SELECT id, email, password_hash, classification, is_verified FROM users WHERE email = @email",
+                    "SELECT id, email, classification, is_verified FROM users WHERE email = @email",
                     connection);
                 userCmd.Parameters.AddWithValue("@email", request.Email);
                 
@@ -189,13 +186,11 @@ namespace MIS321_GroupProject3_Team2.Controllers
 
                 var idOrd = reader.GetOrdinal("id");
                 var emailOrd = reader.GetOrdinal("email");
-                var passwordHashOrd = reader.GetOrdinal("password_hash");
                 var classificationOrd = reader.GetOrdinal("classification");
                 var verifiedOrd = reader.GetOrdinal("is_verified");
 
                 var userId = reader.GetInt32(idOrd);
                 var email = reader.GetString(emailOrd);
-                var passwordHash = reader.IsDBNull(passwordHashOrd) ? null : reader.GetString(passwordHashOrd);
                 var classification = reader.IsDBNull(classificationOrd) ? "user" : reader.GetString(classificationOrd);
                 var isVerified = reader.GetBoolean(verifiedOrd);
                 reader.Close();
@@ -212,15 +207,17 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     return BadRequest(new { message = "Admin account not verified" });
                 }
 
-                // Verify password
-                if (string.IsNullOrEmpty(passwordHash))
+                // Verify password using environment variable or admin password table
+                // For now, use a simple approach: check against environment variable ADMIN_PASSWORD
+                // Or you can create an admin_passwords table
+                var expectedPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "admin123"; // Default for development
+                var hashedExpectedPassword = HashPassword(expectedPassword);
+                var hashedInputPassword = HashPassword(request.Password);
+                
+                if (hashedInputPassword != hashedExpectedPassword)
                 {
-                    return BadRequest(new { message = "Admin account does not have a password set" });
-                }
-
-                var hashedPassword = HashPassword(request.Password);
-                if (passwordHash != hashedPassword)
-                {
+                    // Also check if there's an admin-specific password in the database
+                    // For now, we'll use environment variable approach
                     return Unauthorized(new { message = "Invalid password" });
                 }
 

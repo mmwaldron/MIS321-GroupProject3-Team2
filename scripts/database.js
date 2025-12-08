@@ -26,7 +26,6 @@ const Database = {
       verified: false,
       trustScore: 0,
       passportId: null,
-      passportCode: null,
       verifiedAt: null
     };
     users.push(newUser);

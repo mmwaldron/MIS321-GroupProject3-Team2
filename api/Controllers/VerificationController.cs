@@ -13,13 +13,19 @@ namespace MIS321_GroupProject3_Team2.Controllers
     {
         private readonly string _connectionString;
         private readonly QrAuthService _qrAuthService;
+        private readonly RiskAnalysisService _riskAnalysisService;
+        private readonly DocumentAnalysisService _documentAnalysisService;
+        private readonly GovernmentIdAnalysisService _governmentIdAnalysisService;
         private static readonly Dictionary<string, EmailVerificationCode> _emailVerificationCodes = new();
         private static readonly object _codeLock = new();
         private static DateTime _lastCleanup = DateTime.UtcNow;
 
-        public VerificationController(IConfiguration configuration, QrAuthService qrAuthService)
+        public VerificationController(IConfiguration configuration, QrAuthService qrAuthService, RiskAnalysisService riskAnalysisService, DocumentAnalysisService documentAnalysisService, GovernmentIdAnalysisService governmentIdAnalysisService)
         {
             _qrAuthService = qrAuthService;
+            _riskAnalysisService = riskAnalysisService;
+            _documentAnalysisService = documentAnalysisService;
+            _governmentIdAnalysisService = governmentIdAnalysisService;
             var configConn = configuration.GetConnectionString("DefaultConnection");
             if (string.IsNullOrEmpty(configConn) || configConn == "${JAWSDB_URL}")
             {
@@ -45,6 +51,29 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     return BadRequest(new { success = false, message = "Email is required" });
                 }
                 
+                // Verify CAPTCHA before processing verification request
+                if (string.IsNullOrWhiteSpace(request.CaptchaToken))
+                {
+                    return BadRequest(new { success = false, message = "CAPTCHA verification is required" });
+                }
+                
+                // Verify CAPTCHA token with Google reCAPTCHA API
+                var secretKey = Environment.GetEnvironmentVariable("RECAPTCHA_SECRET_KEY") 
+                    ?? "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"; // Test secret key - replace with your actual key
+                
+                using var httpClient = new HttpClient();
+                var captchaResponse = await httpClient.PostAsync(
+                    $"https://www.google.com/recaptcha/api/siteverify?secret={secretKey}&response={request.CaptchaToken}",
+                    null);
+                
+                var captchaResponseContent = await captchaResponse.Content.ReadAsStringAsync();
+                var captchaResult = JsonSerializer.Deserialize<JsonElement>(captchaResponseContent);
+                
+                if (!captchaResult.TryGetProperty("success", out var successElement) || !successElement.GetBoolean())
+                {
+                    return BadRequest(new { success = false, message = "CAPTCHA verification failed. Please try again." });
+                }
+                
                 var connString = ParseConnectionString(_connectionString);
 
                 using var connection = new MySqlConnection(connString);
@@ -68,18 +97,14 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     checkReader.Close();
                     
                     // Create new user with pending status
-                    // Generate a temporary password hash (user will need to set password later)
-                    var tempPassword = System.Guid.NewGuid().ToString();
-                    var passwordHash = HashPassword(tempPassword);
-                    
+                    // Note: password_hash column removed, users authenticate via QR codes
                     // Generate MFA secret
                     var mfaSecret = GenerateMFASecret();
                     
                     using var insertUserCmd = new MySqlCommand(
-                        "INSERT INTO users (email, password_hash, mfa_secret, is_verified, requires_review, classification) VALUES (@email, @password_hash, @mfa_secret, @is_verified, @requires_review, 'user')",
+                        "INSERT INTO users (email, mfa_secret, is_verified, requires_review, classification) VALUES (@email, @mfa_secret, @is_verified, @requires_review, 'user')",
                         connection);
                     insertUserCmd.Parameters.AddWithValue("@email", request.Email);
-                    insertUserCmd.Parameters.AddWithValue("@password_hash", passwordHash);
                     insertUserCmd.Parameters.AddWithValue("@mfa_secret", mfaSecret);
                     insertUserCmd.Parameters.AddWithValue("@is_verified", false);
                     insertUserCmd.Parameters.AddWithValue("@requires_review", false);
@@ -106,37 +131,78 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     factors = request.Factors
                 });
 
-                // Check if verification already exists for this user
-                using var checkVerificationCmd = new MySqlCommand(
-                    "SELECT id FROM pending_verifications WHERE user_id = @user_id AND status = 'pending'",
-                    connection);
-                checkVerificationCmd.Parameters.AddWithValue("@user_id", userId);
-                
-                var existingVerificationId = await checkVerificationCmd.ExecuteScalarAsync();
+                // Check if verification already exists for this user or if a specific verificationId was provided
                 int verificationId;
                 
-                if (existingVerificationId != null)
+                if (request.VerificationId.HasValue)
                 {
-                    verificationId = Convert.ToInt32(existingVerificationId);
-                    // Update existing verification
-                    using var updateCmd = new MySqlCommand(
-                        "UPDATE pending_verifications SET reason = @reason WHERE id = @id",
+                    // Use the provided verification ID (e.g., from document upload)
+                    verificationId = request.VerificationId.Value;
+                    
+                    // Verify it belongs to this user and update it
+                    using var verifyCmd = new MySqlCommand(
+                        "SELECT id FROM pending_verifications WHERE id = @id AND user_id = @user_id",
                         connection);
-                    updateCmd.Parameters.AddWithValue("@reason", verificationData);
-                    updateCmd.Parameters.AddWithValue("@id", verificationId);
-                    await updateCmd.ExecuteNonQueryAsync();
+                    verifyCmd.Parameters.AddWithValue("@id", verificationId);
+                    verifyCmd.Parameters.AddWithValue("@user_id", userId);
+                    
+                    var exists = await verifyCmd.ExecuteScalarAsync();
+                    if (exists != null)
+                    {
+                        // Update existing verification
+                        using var updateCmd = new MySqlCommand(
+                            "UPDATE pending_verifications SET reason = @reason WHERE id = @id",
+                            connection);
+                        updateCmd.Parameters.AddWithValue("@reason", verificationData);
+                        updateCmd.Parameters.AddWithValue("@id", verificationId);
+                        await updateCmd.ExecuteNonQueryAsync();
+                    }
+                    else
+                    {
+                        // Verification ID doesn't match user, create new one
+                        using var insertVerificationCmd = new MySqlCommand(
+                            "INSERT INTO pending_verifications (user_id, reason, status) VALUES (@user_id, @reason, 'pending')",
+                            connection);
+                        insertVerificationCmd.Parameters.AddWithValue("@user_id", userId);
+                        insertVerificationCmd.Parameters.AddWithValue("@reason", verificationData);
+                        
+                        await insertVerificationCmd.ExecuteNonQueryAsync();
+                        verificationId = (int)insertVerificationCmd.LastInsertedId;
+                    }
                 }
                 else
                 {
-                    // Create new verification record
-                    using var insertVerificationCmd = new MySqlCommand(
-                        "INSERT INTO pending_verifications (user_id, reason, status) VALUES (@user_id, @reason, 'pending')",
+                    // Check if verification already exists for this user
+                    using var checkVerificationCmd = new MySqlCommand(
+                        "SELECT id FROM pending_verifications WHERE user_id = @user_id AND status = 'pending'",
                         connection);
-                    insertVerificationCmd.Parameters.AddWithValue("@user_id", userId);
-                    insertVerificationCmd.Parameters.AddWithValue("@reason", verificationData);
+                    checkVerificationCmd.Parameters.AddWithValue("@user_id", userId);
                     
-                    await insertVerificationCmd.ExecuteNonQueryAsync();
-                    verificationId = (int)insertVerificationCmd.LastInsertedId;
+                    var existingVerificationId = await checkVerificationCmd.ExecuteScalarAsync();
+                    
+                    if (existingVerificationId != null)
+                    {
+                        verificationId = Convert.ToInt32(existingVerificationId);
+                        // Update existing verification
+                        using var updateCmd = new MySqlCommand(
+                            "UPDATE pending_verifications SET reason = @reason WHERE id = @id",
+                            connection);
+                        updateCmd.Parameters.AddWithValue("@reason", verificationData);
+                        updateCmd.Parameters.AddWithValue("@id", verificationId);
+                        await updateCmd.ExecuteNonQueryAsync();
+                    }
+                    else
+                    {
+                        // Create new verification record
+                        using var insertVerificationCmd = new MySqlCommand(
+                            "INSERT INTO pending_verifications (user_id, reason, status) VALUES (@user_id, @reason, 'pending')",
+                            connection);
+                        insertVerificationCmd.Parameters.AddWithValue("@user_id", userId);
+                        insertVerificationCmd.Parameters.AddWithValue("@reason", verificationData);
+                        
+                        await insertVerificationCmd.ExecuteNonQueryAsync();
+                        verificationId = (int)insertVerificationCmd.LastInsertedId;
+                    }
                 }
 
                 return Ok(new { 
@@ -231,6 +297,9 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     var reasonJson = reader.IsDBNull(reasonOrd) ? "{}" : reader.GetString(reasonOrd);
                     var verificationData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
 
+                    // Perform risk analysis
+                    var riskAnalysis = _riskAnalysisService.AnalyzeVerification(verificationData);
+
                     verifications.Add(new
                     {
                         id = reader.GetInt32(idOrd),
@@ -246,6 +315,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                         credibility = verificationData.ContainsKey("credibility") ? verificationData["credibility"].GetDouble() : 0.0,
                         trustScore = verificationData.ContainsKey("trustScore") ? verificationData["trustScore"].GetDouble() : 0.0,
                         factors = verificationData.ContainsKey("factors") ? (object?)verificationData["factors"] : null,
+                        riskAnalysis = riskAnalysis,
                         createdAt = reader.GetDateTime(createdOrd).ToString("yyyy-MM-ddTHH:mm:ss"),
                         reviewedAt = reader.IsDBNull(reviewedOrd) ? null : reader.GetDateTime(reviewedOrd).ToString("yyyy-MM-ddTHH:mm:ss")
                     });
@@ -290,6 +360,9 @@ namespace MIS321_GroupProject3_Team2.Controllers
                 var reasonJson = reader.IsDBNull(reasonOrd) ? "{}" : reader.GetString(reasonOrd);
                 var verificationData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(reasonJson) ?? new Dictionary<string, JsonElement>();
 
+                // Perform risk analysis
+                var riskAnalysis = _riskAnalysisService.AnalyzeVerification(verificationData);
+
                 var verification = new
                 {
                     id = reader.GetInt32(idOrd),
@@ -303,6 +376,7 @@ namespace MIS321_GroupProject3_Team2.Controllers
                     riskLevel = verificationData.ContainsKey("riskLevel") ? verificationData["riskLevel"].GetString() : "low",
                     urgency = verificationData.ContainsKey("urgency") ? verificationData["urgency"].GetDouble() : 0.0,
                     credibility = verificationData.ContainsKey("credibility") ? verificationData["credibility"].GetDouble() : 0.0,
+                    riskAnalysis = riskAnalysis,
                     trustScore = verificationData.ContainsKey("trustScore") ? verificationData["trustScore"].GetDouble() : 0.0,
                     factors = verificationData.ContainsKey("factors") ? (object?)verificationData["factors"] : null,
                     createdAt = reader.GetDateTime(createdOrd).ToString("yyyy-MM-ddTHH:mm:ss"),
@@ -793,6 +867,307 @@ Bio-Isac Team
             return random.Next(1000, 9999).ToString();
         }
 
+        [HttpPost("upload-id")]
+        public async Task<IActionResult> UploadGovernmentId(
+            [FromForm] IFormFile document,
+            [FromForm] string idType,
+            [FromForm] int userId,
+            [FromForm] int? verificationId = null)
+        {
+            try
+            {
+                // Validate file
+                if (document == null || document.Length == 0)
+                {
+                    return BadRequest(new { success = false, message = "No file uploaded" });
+                }
+
+                // Validate file type
+                var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png" };
+                var fileExtension = Path.GetExtension(document.FileName).ToLower();
+                if (!allowedExtensions.Contains(fileExtension))
+                {
+                    return BadRequest(new { success = false, message = "Invalid file type. Only PDF, JPG, and PNG are allowed." });
+                }
+
+                // Validate file size (max 10MB)
+                if (document.Length > 10 * 1024 * 1024)
+                {
+                    return BadRequest(new { success = false, message = "File size exceeds 10MB limit" });
+                }
+
+                var connString = ParseConnectionString(_connectionString);
+                using var connection = new MySqlConnection(connString);
+                await connection.OpenAsync();
+
+                // Get or create verification record
+                int actualVerificationId;
+                if (verificationId.HasValue)
+                {
+                    actualVerificationId = verificationId.Value;
+                }
+                else
+                {
+                    // Create new verification record if it doesn't exist
+                    using var createCmd = new MySqlCommand(
+                        "INSERT INTO pending_verifications (user_id, reason, status) VALUES (@user_id, '{}', 'pending')",
+                        connection);
+                    createCmd.Parameters.AddWithValue("@user_id", userId);
+                    await createCmd.ExecuteNonQueryAsync();
+                    actualVerificationId = (int)createCmd.LastInsertedId;
+                }
+
+                // Generate unique filename
+                var fileName = $"{userId}_{actualVerificationId}_{Guid.NewGuid()}{fileExtension}";
+                // Use absolute path relative to the API directory
+                var apiDirectory = Directory.GetCurrentDirectory();
+                var uploadPath = Path.Combine(apiDirectory, "uploads", "verification_documents");
+                Directory.CreateDirectory(uploadPath);
+                var filePath = Path.Combine(uploadPath, fileName);
+
+                // Save file
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await document.CopyToAsync(stream);
+                }
+
+                // Analyze document (basic analysis)
+                var documentAnalysis = await _documentAnalysisService.AnalyzeDocument(filePath, document);
+
+                // Analyze government ID (ID-specific analysis)
+                var idAnalysis = await _governmentIdAnalysisService.AnalyzeGovernmentId(filePath, idType, document.FileName);
+
+                // Store document metadata in database
+                int documentId;
+                try
+                {
+                    using var insertCmd = new MySqlCommand(
+                        @"INSERT INTO verification_documents
+                           (verification_id, user_id, file_name, file_path, file_type, file_size, mime_type, id_type, extracted_data, id_analysis_result, analysis_result)
+                          VALUES (@verification_id, @user_id, @file_name, @file_path, @file_type, @file_size, @mime_type, @id_type, @extracted_data, @id_analysis_result, @analysis_result)",
+                        connection);
+                    insertCmd.Parameters.AddWithValue("@verification_id", actualVerificationId);
+                    insertCmd.Parameters.AddWithValue("@user_id", userId);
+                    insertCmd.Parameters.AddWithValue("@file_name", document.FileName);
+                    insertCmd.Parameters.AddWithValue("@file_path", filePath);
+                    insertCmd.Parameters.AddWithValue("@file_type", fileExtension);
+                    insertCmd.Parameters.AddWithValue("@file_size", document.Length);
+                    insertCmd.Parameters.AddWithValue("@mime_type", document.ContentType);
+                    insertCmd.Parameters.AddWithValue("@id_type", idType);
+                    insertCmd.Parameters.AddWithValue("@extracted_data", JsonSerializer.Serialize(idAnalysis.ExtractedFields));
+                    insertCmd.Parameters.AddWithValue("@id_analysis_result", JsonSerializer.Serialize(idAnalysis));
+                    insertCmd.Parameters.AddWithValue("@analysis_result", JsonSerializer.Serialize(documentAnalysis));
+
+                    await insertCmd.ExecuteNonQueryAsync();
+                    documentId = (int)insertCmd.LastInsertedId;
+                }
+                catch (MySqlConnector.MySqlException dbEx) when (dbEx.ErrorCode == MySqlConnector.MySqlErrorCode.UnknownTable)
+                {
+                    throw new Exception("verification_documents table does not exist. Please run the database migration: Database/migrations/add_verification_documents.sql", dbEx);
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    documentId = documentId,
+                    verificationId = actualVerificationId,
+                    analysis = idAnalysis,
+                    documentAnalysis = documentAnalysis
+                });
+            }
+            catch (Exception ex)
+            {
+                // Log full exception details for debugging
+                Console.WriteLine($"Error in UploadGovernmentId: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, new { success = false, message = ex.Message, details = ex.StackTrace });
+            }
+        }
+
+        [HttpGet("document/{documentId}")]
+        public async Task<IActionResult> GetDocument(int documentId)
+        {
+            try
+            {
+                var connString = ParseConnectionString(_connectionString);
+                using var connection = new MySqlConnection(connString);
+                await connection.OpenAsync();
+
+                using var cmd = new MySqlCommand(
+                    "SELECT file_path, file_name, mime_type FROM verification_documents WHERE id = @id",
+                    connection);
+                cmd.Parameters.AddWithValue("@id", documentId);
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (!reader.Read())
+                {
+                    return NotFound(new { message = "Document not found" });
+                }
+
+                var filePath = reader.GetString("file_path");
+                var fileName = reader.GetString("file_name");
+                var mimeType = reader.GetString("mime_type");
+
+                if (!System.IO.File.Exists(filePath))
+                {
+                    return NotFound(new { message = "File not found on server" });
+                }
+
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+                return File(fileBytes, mimeType, fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{verificationId}/documents")]
+        public async Task<IActionResult> GetVerificationDocuments(int verificationId)
+        {
+            try
+            {
+                var connString = ParseConnectionString(_connectionString);
+                using var connection = new MySqlConnection(connString);
+                await connection.OpenAsync();
+
+                // First, try to get documents by verification_id
+                using var cmd = new MySqlCommand(
+                    @"SELECT id, file_name, file_type, file_size, mime_type, id_type, extracted_data, id_analysis_result, analysis_result, uploaded_at, user_id
+                      FROM verification_documents 
+                      WHERE verification_id = @verification_id
+                      ORDER BY uploaded_at DESC",
+                    connection);
+                cmd.Parameters.AddWithValue("@verification_id", verificationId);
+
+                var documents = new List<object>();
+                using var reader = await cmd.ExecuteReaderAsync();
+                
+                while (await reader.ReadAsync())
+                {
+                    var idAnalysisJson = reader.IsDBNull(reader.GetOrdinal("id_analysis_result")) 
+                        ? "{}" 
+                        : reader.GetString("id_analysis_result");
+                    
+                    var analysisJson = reader.IsDBNull(reader.GetOrdinal("analysis_result")) 
+                        ? "{}" 
+                        : reader.GetString("analysis_result");
+
+                    documents.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        fileName = reader.GetString("file_name"),
+                        fileType = reader.GetString("file_type"),
+                        fileSize = reader.GetInt64("file_size"),
+                        mimeType = reader.GetString("mime_type"),
+                        idType = reader.IsDBNull(reader.GetOrdinal("id_type")) ? null : reader.GetString("id_type"),
+                        extractedData = reader.IsDBNull(reader.GetOrdinal("extracted_data")) 
+                            ? null 
+                            : JsonSerializer.Deserialize<object>(reader.GetString("extracted_data")),
+                        idAnalysis = JsonSerializer.Deserialize<object>(idAnalysisJson),
+                        analysis = JsonSerializer.Deserialize<object>(analysisJson),
+                        uploadedAt = reader.GetDateTime("uploaded_at").ToString("yyyy-MM-ddTHH:mm:ss")
+                    });
+                }
+
+                // If no documents found by verification_id, try to find by user_id from the verification
+                // This handles cases where documents were uploaded before the verification was finalized
+                if (documents.Count == 0)
+                {
+                    reader.Close();
+                    
+                    // Get user_id from the verification record
+                    using var verificationCmd = new MySqlCommand(
+                        "SELECT user_id FROM pending_verifications WHERE id = @verification_id",
+                        connection);
+                    verificationCmd.Parameters.AddWithValue("@verification_id", verificationId);
+                    
+                    var userIdObj = await verificationCmd.ExecuteScalarAsync();
+                    if (userIdObj != null)
+                    {
+                        var userId = Convert.ToInt32(userIdObj);
+                        
+                        // Try to find documents by user_id (including those with different or null verification_id)
+                        using var userDocsCmd = new MySqlCommand(
+                            @"SELECT id, file_name, file_type, file_size, mime_type, id_type, extracted_data, id_analysis_result, analysis_result, uploaded_at, verification_id
+                              FROM verification_documents 
+                              WHERE user_id = @user_id
+                              ORDER BY uploaded_at DESC
+                              LIMIT 10",
+                            connection);
+                        userDocsCmd.Parameters.AddWithValue("@user_id", userId);
+                        
+                        using var userDocsReader = await userDocsCmd.ExecuteReaderAsync();
+                        var docIdsToUpdate = new List<int>();
+                        
+                        while (await userDocsReader.ReadAsync())
+                        {
+                            var docId = userDocsReader.GetInt32("id");
+                            var docVerificationId = userDocsReader.IsDBNull(userDocsReader.GetOrdinal("verification_id")) 
+                                ? (int?)null 
+                                : userDocsReader.GetInt32("verification_id");
+                            
+                            // If document has a different verification_id or null, mark it for update
+                            if (docVerificationId != verificationId)
+                            {
+                                docIdsToUpdate.Add(docId);
+                            }
+                            
+                            var idAnalysisJson = userDocsReader.IsDBNull(userDocsReader.GetOrdinal("id_analysis_result")) 
+                                ? "{}" 
+                                : userDocsReader.GetString("id_analysis_result");
+                            
+                            var analysisJson = userDocsReader.IsDBNull(userDocsReader.GetOrdinal("analysis_result")) 
+                                ? "{}" 
+                                : userDocsReader.GetString("analysis_result");
+
+                            documents.Add(new
+                            {
+                                id = docId,
+                                fileName = userDocsReader.GetString("file_name"),
+                                fileType = userDocsReader.GetString("file_type"),
+                                fileSize = userDocsReader.GetInt64("file_size"),
+                                mimeType = userDocsReader.GetString("mime_type"),
+                                idType = userDocsReader.IsDBNull(userDocsReader.GetOrdinal("id_type")) ? null : userDocsReader.GetString("id_type"),
+                                extractedData = userDocsReader.IsDBNull(userDocsReader.GetOrdinal("extracted_data")) 
+                                    ? null 
+                                    : JsonSerializer.Deserialize<object>(userDocsReader.GetString("extracted_data")),
+                                idAnalysis = JsonSerializer.Deserialize<object>(idAnalysisJson),
+                                analysis = JsonSerializer.Deserialize<object>(analysisJson),
+                                uploadedAt = userDocsReader.GetDateTime("uploaded_at").ToString("yyyy-MM-ddTHH:mm:ss")
+                            });
+                        }
+                        
+                        userDocsReader.Close();
+                        
+                        // Update documents to link them to the correct verification
+                        if (docIdsToUpdate.Count > 0)
+                        {
+                            foreach (var docId in docIdsToUpdate)
+                            {
+                                using var updateDocCmd = new MySqlCommand(
+                                    "UPDATE verification_documents SET verification_id = @verification_id WHERE id = @doc_id",
+                                    connection);
+                                updateDocCmd.Parameters.AddWithValue("@verification_id", verificationId);
+                                updateDocCmd.Parameters.AddWithValue("@doc_id", docId);
+                                await updateDocCmd.ExecuteNonQueryAsync();
+                            }
+                        }
+                    }
+                }
+
+                return Ok(documents);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message, stackTrace = ex.StackTrace });
+            }
+        }
+
         private static string ParseConnectionString(string connectionString)
         {
             if (connectionString.StartsWith("mysql://"))
@@ -880,6 +1255,8 @@ Bio-Isac Team
         public double Credibility { get; set; }
         public double TrustScore { get; set; }
         public object? Factors { get; set; }
+        public int? VerificationId { get; set; } // Optional: if provided, update existing verification
+        public string? CaptchaToken { get; set; } // Required: CAPTCHA verification token
     }
 }
 

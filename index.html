@@ -158,6 +158,36 @@
           role="tabpanel"
           aria-labelledby="verify-tab"
         >
+          <!-- Status Check Section -->
+          <div class="row justify-content-center mb-4">
+            <div class="col-lg-8">
+              <div class="card">
+                <div class="card-body p-4">
+                  <div class="text-center mb-3">
+                    <h5 class="text-success mb-2">Check Verification Status</h5>
+                    <p class="text-muted">Enter your email to check your verification status</p>
+                  </div>
+                  <form id="statusCheckForm" onsubmit="checkVerificationStatus(event)">
+                    <div class="mb-3">
+                      <label class="form-label">Email Address</label>
+                      <input
+                        type="email"
+                        class="form-control bg-dark text-light border-success"
+                        id="statusCheckEmail"
+                        placeholder="your.email@example.com"
+                        required
+                      />
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                      <i class="bi bi-search"></i> Check Status
+                    </button>
+                  </form>
+                  <div id="statusCheckResult" class="mt-4" style="display: none;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Verification Section -->
       <div class="row justify-content-center">
         <div class="col-lg-8">
@@ -209,7 +239,15 @@
                         required
                       />
                     </div>
-                    <button type="submit" class="btn btn-success w-100">
+                    <!-- CAPTCHA Widget -->
+                    <div class="mb-3">
+                      <label class="form-label">Security Verification <span class="text-danger">*</span></label>
+                      <div id="captchaContainer" class="d-flex justify-content-center"></div>
+                      <small class="text-muted d-block text-center mt-2">
+                        Please complete the security verification to continue
+                      </small>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100" id="basicInfoSubmitBtn" disabled>
                       Continue <i class="bi bi-arrow-right"></i>
                     </button>
                   </form>
@@ -219,9 +257,55 @@
                 <div class="step" id="step2" style="display: none">
                   <h5 class="step-title">
                     <span class="step-number">2</span>
-                    Digital Credentials
+                    Identity Verification
                   </h5>
                   <form id="credentialsForm">
+                    <!-- ID Type Selection -->
+                    <div class="mb-3">
+                      <label class="form-label">Government ID Type <span class="text-danger">*</span></label>
+                      <select
+                        class="form-select bg-dark text-light border-success"
+                        id="idType"
+                        required
+                      >
+                        <option value="">Select ID Type</option>
+                        <option value="drivers_license">Driver's License</option>
+                        <option value="passport">Passport</option>
+                        <option value="state_id">State ID Card</option>
+                        <option value="military_id">Military ID</option>
+                        <option value="permanent_resident">Permanent Resident Card</option>
+                        <option value="other">Other Government ID</option>
+                      </select>
+                      <small class="text-muted">Select the type of government-issued ID you will upload</small>
+                    </div>
+                    <!-- Government ID Upload (Required) -->
+                    <div class="mb-3">
+                      <label class="form-label">
+                        Upload Government-Issued ID <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        type="file"
+                        class="form-control bg-dark text-light border-success"
+                        id="verificationDoc"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        required
+                      />
+                      <small class="text-muted">
+                        Upload a clear photo or scan of your government-issued ID (front and back if applicable)
+                      </small>
+                    </div>
+                    <!-- ID Number (extracted or manual entry) -->
+                    <div class="mb-3">
+                      <label class="form-label">ID Number</label>
+                      <input
+                        type="text"
+                        class="form-control bg-dark text-light border-success"
+                        id="idNumber"
+                        placeholder="Will be extracted from ID or enter manually"
+                      />
+                      <small class="text-muted">ID number will be automatically extracted from your document</small>
+                    </div>
+                    <!-- Last 4 digits of SSN (optional) -->
                     <div class="mb-3">
                       <label class="form-label">Last 4 digits of your Social Security Number</label>
                       <input
@@ -229,156 +313,34 @@
                         class="form-control bg-dark text-light border-success"
                         id="govId"
                         placeholder="Last 4 digits"
-                        required
+                        maxlength="4"
                       />
+                      <small class="text-muted">Optional: For additional verification</small>
                     </div>
+                    <!-- Company Email -->
                     <div class="mb-3">
-                      <label class="form-label">Verification Document (Optional: Must be a government issued ID)</label>
-                      <input
-                        type="file"
-                        class="form-control bg-dark text-light border-success"
-                        id="verificationDoc"
-                        accept=".pdf,.jpg,.png"
-                      />
-                      <small class="text-muted">Upload ID or verification document</small>
-                    </div>
-                    <div class="mb-3">
-                      <label class="form-label">Company Email Address (Optional: Must be a company email address)/label>
+                      <label class="form-label">Company Email Address</label>
                       <input
                         type="email"
                         class="form-control bg-dark text-light border-success"
                         id="companyEmail"
                         placeholder="your.email@company.com"
-                        required
                       />
-                      <small class="text-muted">We'll send a verification code to this email</small>
+                      <small class="text-muted">Preferred, but not required</small>
                     </div>
                     <div class="d-flex gap-2">
                       <button type="button" class="btn btn-outline-secondary" onclick="goToStep(1)">
                         Back
                       </button>
                       <button type="submit" class="btn btn-success flex-grow-1">
-                        Send Verification Code <i class="bi bi-arrow-right"></i>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <!-- Step 2.5: Email Verification Code -->
-                <div class="step" id="step2_5" style="display: none">
-                  <h5 class="step-title">
-                    <span class="step-number">2.5</span>
-                    Email Verification
-                  </h5>
-                  <div class="mb-4 text-center">
-                    <i class="bi bi-envelope-check text-success" style="font-size: 3rem;"></i>
-                    <p class="text-muted mt-3">We've sent a verification code to <strong id="emailDisplay"></strong></p>
-                  </div>
-                  <form id="emailVerificationForm">
-                    <div class="mb-3">
-                      <label class="form-label">Verification Code</label>
-                      <input
-                        type="text"
-                        class="form-control bg-dark text-light border-success text-center"
-                        id="emailVerificationCode"
-                        maxlength="8"
-                        placeholder="Enter code"
-                        style="font-size: 1.25rem; letter-spacing: 0.25rem; font-family: 'Courier New', monospace;"
-                        required
-                      />
-                      <small class="text-muted d-block mt-2 text-center">Code expires in 10 minutes</small>
-                    </div>
-                    <div class="mb-3">
-                      <button
-                        type="button"
-                        class="btn btn-link text-success p-0"
-                        id="resendEmailCode"
-                      >
-                        Resend Code
-                      </button>
-                    </div>
-                    <div class="d-flex gap-2">
-                      <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2)">
-                        Back
-                      </button>
-                      <button type="submit" class="btn btn-success flex-grow-1">
-                        Verify Email <i class="bi bi-shield-check"></i>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <!-- Step 2.75: CAPTCHA Verification -->
-                <div class="step" id="step2_75" style="display: none">
-                  <h5 class="step-title">
-                    <span class="step-number">2.75</span>
-                    Security Verification
-                  </h5>
-                  <div class="mb-4 text-center">
-                    <i class="bi bi-shield-lock text-success" style="font-size: 3rem;"></i>
-                    <p class="text-muted mt-3">Please complete the security verification below</p>
-                  </div>
-                  <form id="captchaForm">
-                    <div class="mb-4 d-flex justify-content-center">
-                      <div id="captchaContainer"></div>
-                    </div>
-                    <div class="d-flex gap-2">
-                      <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2.5)">
-                        Back
-                      </button>
-                      <button type="submit" class="btn btn-success flex-grow-1" id="captchaSubmitBtn" disabled>
                         Continue <i class="bi bi-arrow-right"></i>
                       </button>
                     </div>
                   </form>
                 </div>
 
-                <!-- Step 3: MFA -->
+                <!-- Step 3: Processing -->
                 <div class="step" id="step3" style="display: none">
-                  <h5 class="step-title">
-                    <span class="step-number">3</span>
-                    Multi-Factor Authentication
-                  </h5>
-                  <div class="mfa-container">
-                    <div class="mb-4 text-center">
-                      <div class="mfa-code-display" id="mfaCode">----</div>
-                      <p class="text-muted mt-2">Enter the code sent to your email</p>
-                    </div>
-                    <form id="mfaForm">
-                      <div class="mb-3">
-                        <label class="form-label">Verification Code</label>
-                        <input
-                          type="text"
-                          class="form-control bg-dark text-light border-success text-center"
-                          id="mfaInput"
-                          maxlength="4"
-                          placeholder="0000"
-                          required
-                        />
-                      </div>
-                      <div class="mb-3">
-                        <button
-                          type="button"
-                          class="btn btn-link text-success p-0"
-                          id="resendCode"
-                        >
-                          Resend Code
-                        </button>
-                      </div>
-                      <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2)">
-                          Back
-                        </button>
-                        <button type="submit" class="btn btn-success flex-grow-1">
-                          Verify <i class="bi bi-shield-check"></i>
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-
-                <!-- Step 4: Processing -->
-                <div class="step" id="step4" style="display: none">
                   <div class="text-center py-5">
                     <div class="processing-spinner mb-4">
                       <div class="spinner-border text-success" role="status">
@@ -398,8 +360,8 @@
                   </div>
                 </div>
 
-                <!-- Step 5: Result -->
-                <div class="step" id="step5" style="display: none">
+                <!-- Step 4: Result -->
+                <div class="step" id="step4" style="display: none">
                   <div class="text-center py-4">
                     <div class="result-icon mb-4" id="resultIcon"></div>
                     <h4 id="resultTitle" class="mb-3"></h4>
@@ -450,22 +412,6 @@
     <script src="./scripts/api.js"></script>
     <script src="./scripts/riskFilter.js"></script>
     <script src="./scripts/trustScore.js"></script>
-    <script>
-      // Check if user is logged in and redirect appropriately
-      (function() {
-        const userId = localStorage.getItem('currentUserId');
-        const userClassification = localStorage.getItem('userClassification');
-        
-        if (userId) {
-          // User is logged in, redirect based on classification
-          if (userClassification === 'admin') {
-            window.location.replace('admin.html');
-          } else {
-            window.location.replace('dashboard.html');
-          }
-        }
-      })();
-    </script>
     <script src="./scripts/verification.js"></script>
     <script src="./scripts/main.js"></script>
   </body>

@@ -35,7 +35,10 @@ const API = {
       
       return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      // Only log non-404 errors (404s are expected for "not found" cases)
+      if (error.status !== 404) {
+        console.error('API request failed:', error);
+      }
       
       // Provide helpful error messages
       if (error.message.includes('Failed to fetch') || error.message.includes('CORS') || error.name === 'TypeError') {
@@ -103,6 +106,10 @@ const API = {
     return await this.request(`/verifications/user/${userId}`);
   },
 
+  async getVerificationDocuments(verificationId) {
+    return await this.request(`/verifications/${verificationId}/documents`);
+  },
+
   async updateVerification(verificationId, updates) {
     return await this.request(`/verifications/${verificationId}`, {
       method: 'PUT',
@@ -124,36 +131,8 @@ const API = {
     });
   },
 
-  // Passport operations
-  async getPassportByCode(code) {
-    return await this.request(`/passport/code/${code}`);
-  },
+  // Note: Old passport code system removed - use QR login instead
 
-  // Message operations
-  async createMessage(messageData) {
-    return await this.request('/messages', {
-      method: 'POST',
-      body: JSON.stringify(messageData)
-    });
-  },
-
-  async getMessages() {
-    return await this.request('/messages');
-  },
-
-  async getMessagesByUserId(userId) {
-    return await this.request(`/messages/user/${userId}`);
-  },
-
-  async getUnreadMessages() {
-    return await this.request('/messages/unread');
-  },
-
-  async markMessageRead(messageId) {
-    return await this.request(`/messages/${messageId}/read`, {
-      method: 'PUT'
-    });
-  },
 
   // Alert operations
   async createAlert(alertData) {

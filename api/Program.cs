@@ -33,6 +33,18 @@ builder.Services.AddSingleton<MIS321_GroupProject3_Team2.Services.NvdIngestServi
 builder.Services.AddSingleton<MIS321_GroupProject3_Team2.Services.QrAuthService>(
     sp => new MIS321_GroupProject3_Team2.Services.QrAuthService(builder.Configuration));
 
+// Register Risk Analysis Service
+builder.Services.AddSingleton<MIS321_GroupProject3_Team2.Services.RiskAnalysisService>(
+    sp => new MIS321_GroupProject3_Team2.Services.RiskAnalysisService(builder.Configuration));
+
+// Register Document Analysis Service
+builder.Services.AddSingleton<MIS321_GroupProject3_Team2.Services.DocumentAnalysisService>(
+    sp => new MIS321_GroupProject3_Team2.Services.DocumentAnalysisService());
+
+// Register Government ID Analysis Service
+builder.Services.AddSingleton<MIS321_GroupProject3_Team2.Services.GovernmentIdAnalysisService>(
+    sp => new MIS321_GroupProject3_Team2.Services.GovernmentIdAnalysisService());
+
 builder.Services.AddControllers();
 
 builder.Services.AddCors(options => 

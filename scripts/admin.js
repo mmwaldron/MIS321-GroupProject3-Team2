@@ -3,12 +3,22 @@ let currentCaseId = null;
 let allVerifications = [];
 
 async function loadDashboard() {
+  // Check if user is actually logged in as admin before loading
+  const userId = localStorage.getItem('currentUserId');
+  const userClassification = localStorage.getItem('userClassification');
+  
+  if (!userId || userClassification !== 'admin') {
+    // Not logged in as admin, don't load dashboard or show notifications
+    console.log('User not authenticated as admin, skipping dashboard load');
+    return;
+  }
+  
   try {
     allVerifications = await API.getVerifications();
     console.log('Loaded verifications:', allVerifications.length, allVerifications);
     await updateStats();
     await displayCases();
-    await loadMessages();
+    // Only check alerts after confirming admin is logged in
     await checkAlerts();
   } catch (error) {
     console.error('Failed to load dashboard:', error);
@@ -33,6 +43,13 @@ async function updateStats() {
 async function displayCases() {
   const tbody = document.getElementById('casesTableBody');
   if (!tbody) return;
+
+  // Check if there's a search term - if so, use applyFilters instead
+  const searchName = document.getElementById('searchName')?.value?.toLowerCase().trim() || '';
+  if (searchName) {
+    await applyFilters();
+    return;
+  }
 
   // Filter to only show pending users
   const pendingVerifications = allVerifications.filter(v => v.status === 'pending');
@@ -146,6 +163,183 @@ function getCredibilityBadge(credibility) {
   return '<span class="badge bg-danger">Low</span>';
 }
 
+function getRiskColor(riskLevel) {
+  const colors = {
+    'high': 'danger',
+    'medium': 'warning',
+    'low': 'success'
+  };
+  return colors[riskLevel] || 'secondary';
+}
+
+function getSeverityColor(severity) {
+  const colors = {
+    'info': 'info',
+    'low': 'success',
+    'medium': 'warning',
+    'high': 'danger'
+  };
+  return colors[severity] || 'secondary';
+}
+
+function formatIdType(idType) {
+  const types = {
+    'drivers_license': "Driver's License",
+    'passport': 'Passport',
+    'state_id': 'State ID',
+    'military_id': 'Military ID',
+    'permanent_resident': 'Permanent Resident Card',
+    'other': 'Other'
+  };
+  return types[idType] || idType;
+}
+
+function formatFieldName(key) {
+  const names = {
+    'idNumber': 'ID Number',
+    'name': 'Name',
+    'dateOfBirth': 'Date of Birth',
+    'expirationDate': 'Expiration Date',
+    'address': 'Address',
+    'nationality': 'Nationality'
+  };
+  return names[key] || key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function generateDocumentsHtml(documents) {
+  if (!documents || documents.length === 0) {
+    return `
+      <div class="col-12 mb-3">
+        <h6 class="text-success">Uploaded Documents</h6>
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle"></i> No documents uploaded
+        </div>
+      </div>
+    `;
+  }
+  
+  return `
+    <div class="col-12 mb-3">
+      <h6 class="text-success">Uploaded Documents</h6>
+      ${documents.map(doc => {
+        // Parse JSON strings if needed
+        let idAnalysis = {};
+        let analysis = {};
+        let extractedData = {};
+        
+        try {
+          if (typeof doc.idAnalysis === 'string') {
+            idAnalysis = JSON.parse(doc.idAnalysis);
+          } else {
+            idAnalysis = doc.idAnalysis || {};
+          }
+          
+          if (typeof doc.analysis === 'string') {
+            analysis = JSON.parse(doc.analysis);
+          } else {
+            analysis = doc.analysis || {};
+          }
+          
+          if (typeof doc.extractedData === 'string') {
+            extractedData = JSON.parse(doc.extractedData);
+          } else {
+            extractedData = doc.extractedData || {};
+          }
+        } catch (e) {
+          console.error('Error parsing document data:', e);
+          idAnalysis = doc.idAnalysis || {};
+          analysis = doc.analysis || {};
+          extractedData = doc.extractedData || {};
+        }
+        
+        return `
+          <div class="card bg-dark border-${getRiskColor(idAnalysis.riskLevel || 'low')} mb-2">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div class="flex-grow-1">
+                  <h6 class="mb-1">
+                    <i class="bi bi-file-earmark"></i> ${doc.fileName}
+                  </h6>
+                  <p class="mb-1 text-muted">
+                    <small>
+                      ${(doc.fileSize / 1024).toFixed(2)} KB • 
+                      ${doc.fileType.toUpperCase()} • 
+                      Risk: <span class="badge bg-${getRiskColor(idAnalysis.riskLevel || 'low')}">
+                        ${idAnalysis.riskLevel || 'unknown'}
+                      </span>
+                    </small>
+                  </p>
+                  ${doc.idType ? `<p class="mb-1"><small><strong>ID Type:</strong> ${formatIdType(doc.idType)}</small></p>` : ''}
+                </div>
+                <div>
+                  <a href="${API_CONFIG.getUrl(`/verifications/document/${doc.id}`)}"
+                     target="_blank"
+                     class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-download"></i> View
+                  </a>
+                </div>
+              </div>
+              
+              ${idAnalysis.extractedFields && Object.keys(idAnalysis.extractedFields).length > 0 ? `
+                <div class="mb-2">
+                  <strong>Extracted Information:</strong>
+                  <ul class="list-unstyled mt-1 mb-0">
+                    ${Object.entries(idAnalysis.extractedFields).map(([key, value]) => `
+                      <li><small><strong>${formatFieldName(key)}:</strong> ${value || 'N/A'}</small></li>
+                    `).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              
+              ${idAnalysis.flags && idAnalysis.flags.length > 0 ? `
+                <div class="mb-2">
+                  <strong>ID Validation Flags:</strong>
+                  <div class="list-group list-group-flush mt-1">
+                    ${idAnalysis.flags.map(flag => `
+                      <div class="list-group-item bg-dark border-${getSeverityColor(flag.severity)} px-0 py-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                          <div>
+                            <span class="badge bg-${getSeverityColor(flag.severity)} me-1">
+                              ${flag.severity.toUpperCase()}
+                            </span>
+                            <small>${flag.message}</small>
+                          </div>
+                        </div>
+                        <small class="text-muted d-block mt-1">${flag.impact}</small>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+              
+              ${analysis.flags && analysis.flags.length > 0 ? `
+                <div class="mb-2">
+                  <strong>Document Analysis Flags:</strong>
+                  <div class="list-group list-group-flush mt-1">
+                    ${analysis.flags.map(flag => `
+                      <div class="list-group-item bg-dark border-${getSeverityColor(flag.severity)} px-0 py-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                          <div>
+                            <span class="badge bg-${getSeverityColor(flag.severity)} me-1">
+                              ${flag.severity.toUpperCase()}
+                            </span>
+                            <small>${flag.message}</small>
+                          </div>
+                        </div>
+                        <small class="text-muted d-block mt-1">${flag.impact}</small>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
 async function viewCase(caseId) {
   currentCaseId = caseId;
   try {
@@ -156,6 +350,93 @@ async function viewCase(caseId) {
     const modalBody = document.getElementById('caseModalBody');
     const approveBtn = document.getElementById('approveBtn');
     const denyBtn = document.getElementById('denyBtn');
+    
+    // Fetch documents for this verification
+    let documents = [];
+    try {
+      const documentsResponse = await API.getVerificationDocuments(caseId);
+      if (Array.isArray(documentsResponse)) {
+        documents = documentsResponse;
+      } else if (documentsResponse && Array.isArray(documentsResponse.data)) {
+        documents = documentsResponse.data;
+      }
+      console.log('Fetched documents for verification ID:', caseId, 'Found', documents.length, 'documents:', documents);
+    } catch (error) {
+      console.error('Failed to fetch documents for verification ID:', caseId, error);
+      // Still show the documents section even if fetch fails
+    }
+
+    // Parse risk analysis if available
+    let riskAnalysisHtml = '';
+    if (verification.riskAnalysis) {
+      const riskAnalysis = verification.riskAnalysis;
+      
+      riskAnalysisHtml = `
+        <div class="col-12 mb-3">
+          <h6 class="text-success">Risk Analysis</h6>
+          <div class="card bg-dark border-${getRiskColor(riskAnalysis.riskLevel)}">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <p><strong class="text-light">Overall Risk Score:</strong> 
+                    <span class="badge bg-${getRiskColor(riskAnalysis.riskLevel)}">
+                      ${riskAnalysis.overallRiskScore.toFixed(1)} / 100
+                    </span>
+                  </p>
+                  <p><strong class="text-light">Risk Level:</strong> ${getRiskBadge(riskAnalysis.riskLevel)}</p>
+                </div>
+                <div class="col-md-6">
+                  <p><strong>Total Flags:</strong> ${riskAnalysis.flags.length}</p>
+                  <p><strong>High Severity:</strong> 
+                    ${riskAnalysis.flags.filter(f => f.severity === 'high').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-12 mb-3">
+          <h6 class="text-success">Risk Flags</h6>
+          <div class="list-group">
+            ${riskAnalysis.flags.map(flag => `
+              <div class="list-group-item bg-dark border-${getSeverityColor(flag.severity)}">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h6 class="mb-1">
+                      <span class="badge bg-${getSeverityColor(flag.severity)}">${flag.severity.toUpperCase()}</span>
+                      ${flag.message}
+                    </h6>
+                    <p class="mb-0 text-muted"><small>${flag.impact}</small></p>
+                  </div>
+                  <small class="text-muted">${flag.type}</small>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <div class="col-12 mb-3">
+          <h6 class="text-success">Recommendations</h6>
+          <ul class="list-group">
+            ${riskAnalysis.recommendations.map(rec => `
+              <li class="list-group-item bg-dark border-success">
+                <i class="bi bi-check-circle text-success"></i> ${rec}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    // Log verification details for debugging
+    console.log('Viewing verification:', {
+      id: caseId,
+      userId: verification.userId,
+      status: verification.status,
+      name: verification.name,
+      email: verification.email
+    });
 
     modalBody.innerHTML = `
       <div class="row">
@@ -163,8 +444,7 @@ async function viewCase(caseId) {
           <h6 class="text-success">User Information</h6>
           <p><strong>Name:</strong> ${verification.name || 'N/A'}</p>
           <p><strong>Email:</strong> ${verification.email || user?.email || 'N/A'}</p>
-          <p><strong>Phone:</strong> ${verification.phone || 'N/A'}</p>
-          <p><strong>Organization:</strong> ${verification.organization || 'N/A'}</p>
+          <p><small class="text-muted">Verification ID: ${caseId} | User ID: ${verification.userId}</small></p>
         </div>
         <div class="col-md-6 mb-3">
           <h6 class="text-success">Verification Details</h6>
@@ -175,20 +455,28 @@ async function viewCase(caseId) {
           <p><strong>Credibility:</strong> ${verification.credibility}</p>
           <p><strong>Trust Score:</strong> ${verification.trustScore || 0}</p>
           <div id="qrCodeSection" style="display: none;">
-            <p><strong>QR Passport:</strong></p>
-            <div class="mb-2 text-center">
-              <img id="qrCodeImage" src="" alt="QR Code" class="img-fluid border border-success rounded" style="max-width: 250px; max-height: 250px;" />
+            <div class="card bg-dark border-success mb-3">
+              <div class="card-body text-center">
+                <h6 class="text-success mb-3">
+                  <i class="bi bi-qr-code"></i> QR Passport Code
+                </h6>
+                <div class="mb-3">
+                  <img id="qrCodeImage" src="" alt="QR Code" class="img-fluid border border-success rounded shadow" style="max-width: 300px; max-height: 300px; background: white; padding: 10px;" />
+                </div>
+                <div class="d-flex gap-2 justify-content-center">
+                  <button class="btn btn-success btn-lg" onclick="downloadQrCode()">
+                    <i class="bi bi-download"></i> Download QR Code
+                  </button>
+                </div>
+                <small class="text-muted d-block mt-3">
+                  <i class="bi bi-info-circle"></i> Share this QR code with the user for login access
+                </small>
+              </div>
             </div>
-            <div class="text-center">
-              <button class="btn btn-success" onclick="downloadQrCode()">
-                <i class="bi bi-download"></i> Download QR Code
-              </button>
-            </div>
-            <small class="text-muted d-block mt-2 text-center">
-              Share this QR code with the user for login access
-            </small>
           </div>
         </div>
+        ${riskAnalysisHtml}
+        ${generateDocumentsHtml(documents)}
         <div class="col-12 mb-3">
           <h6 class="text-success">Risk Factors</h6>
           <pre class="bg-dark p-3 border border-success rounded">${JSON.stringify(verification.factors || {}, null, 2)}</pre>
@@ -196,13 +484,6 @@ async function viewCase(caseId) {
         <div class="col-12 mb-3">
           <h6 class="text-success">Admin Notes</h6>
           <textarea class="form-control bg-dark text-light border-success" id="adminNotes" rows="3"></textarea>
-        </div>
-        <div class="col-12">
-          ${verification.status === 'approved' ? '' : `
-          <button class="btn btn-outline-success" onclick="generateQrForUser(${verification.userId})" id="generateQrBtn">
-            <i class="bi bi-qr-code"></i> Generate QR Passport
-          </button>
-          `}
         </div>
       </div>
     `;
@@ -212,13 +493,19 @@ async function viewCase(caseId) {
       approveBtn.style.display = 'inline-block';
       denyBtn.style.display = 'inline-block';
     } else if (verification.status === 'approved') {
-      // If already approved, hide approve/deny buttons and show QR if available
+      // If already approved, hide approve/deny buttons and generate QR code
       approveBtn.style.display = 'none';
       denyBtn.style.display = 'none';
-      // Try to get QR code if user is already approved (but don't show error if it fails)
-      generateQrForUser(verification.userId).catch(err => {
-        console.log('QR code not yet generated for this user');
-      });
+      
+      // Automatically generate and display QR code for approved users
+      if (verification.userId) {
+        try {
+          await generateQrForUser(verification.userId);
+        } catch (error) {
+          console.error('Failed to generate QR code for approved user:', error);
+          // Don't show error to user, just log it
+        }
+      }
     } else {
       approveBtn.style.display = 'none';
       denyBtn.style.display = 'none';
@@ -264,6 +551,11 @@ async function approveCase() {
         if (generateQrBtn) {
           generateQrBtn.style.display = 'none';
         }
+        
+        // Scroll to QR code section to make it visible
+        setTimeout(() => {
+          qrSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
       }
       
       // Update status badge in modal
@@ -272,7 +564,7 @@ async function approveCase() {
         statusBadge.innerHTML = `<strong>Status:</strong> ${getStatusBadge('approved')}`;
       }
       
-      // Hide approve/deny buttons and show success message
+      // Hide approve/deny buttons
       if (approveBtn) {
         approveBtn.style.display = 'none';
         approveBtn.disabled = false;
@@ -288,7 +580,7 @@ async function approveCase() {
         const alertDiv = document.createElement('div');
         alertDiv.className = 'alert alert-success alert-dismissible fade show';
         alertDiv.innerHTML = `
-          <strong>Verification Approved!</strong> QR Passport generated successfully. Download and share the QR code with the user.
+          <strong><i class="bi bi-check-circle"></i> Verification Approved!</strong> QR Passport generated successfully. Download the QR code below and share it with the user.
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
         `;
         modalBody.insertBefore(alertDiv, modalBody.firstChild);
@@ -341,41 +633,23 @@ async function denyCase() {
 }
 
 async function applyFilters() {
-  const statusFilter = document.getElementById('filterStatus').value;
-  const riskFilter = document.getElementById('filterRisk').value;
-  const sortBy = document.getElementById('sortBy').value;
+  const searchName = document.getElementById('searchName')?.value?.toLowerCase().trim() || '';
 
-  let filtered = [...allVerifications];
+  // Filter to only show pending users by default
+  let filtered = allVerifications.filter(v => v.status === 'pending');
 
-  // Filter by status
-  if (statusFilter !== 'all') {
-    filtered = filtered.filter(v => v.status === statusFilter);
-  }
-
-  // Filter by risk
-  if (riskFilter !== 'all') {
-    filtered = filtered.filter(v => v.riskLevel === riskFilter);
-  }
-
-  // Sort
-  if (sortBy === 'urgency') {
-    filtered.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
-  } else if (sortBy === 'credibility') {
-    filtered.sort((a, b) => (b.credibility || 0) - (a.credibility || 0));
-  } else if (sortBy === 'date') {
-    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  } else if (sortBy === 'name') {
-    filtered.sort((a, b) => {
-      const nameA = a.name || '';
-      const nameB = b.name || '';
-      return nameA.localeCompare(nameB);
+  // Filter by name if search term provided
+  if (searchName) {
+    filtered = filtered.filter(v => {
+      const name = (v.name || '').toLowerCase();
+      return name.includes(searchName);
     });
   }
 
   // Display filtered results
   const tbody = document.getElementById('casesTableBody');
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No cases match filters</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No cases found</td></tr>';
     return;
   }
 
@@ -450,64 +724,6 @@ async function applyFilters() {
   });
 }
 
-async function loadMessages() {
-  const messagesList = document.getElementById('messagesList');
-  if (!messagesList) return;
-
-  try {
-    const messages = await API.getUnreadMessages();
-    document.getElementById('messageCount').textContent = messages.length;
-
-    if (messages.length === 0) {
-      messagesList.innerHTML = '<p class="text-muted text-center">No new messages</p>';
-      return;
-    }
-
-    // Fetch user info for each message
-    const messageHtml = await Promise.all(messages.map(async (m) => {
-      let userName = 'Unknown';
-      let userEmail = '';
-      try {
-        const user = await API.getUser(m.userId);
-        userName = user?.email || 'Unknown';
-        userEmail = user?.email || '';
-      } catch (error) {
-        console.error(`Failed to fetch user ${m.userId}:`, error);
-      }
-
-      return `
-        <div class="message-item border-bottom border-success pb-3 mb-3">
-          <div class="d-flex justify-content-between align-items-start">
-            <div>
-              <h6 class="mb-1">${m.subject || 'No subject'}</h6>
-              <p class="text-muted mb-1">From: ${userName} (${userEmail})</p>
-              <p class="mb-0">${m.message || ''}</p>
-            </div>
-            <button class="btn btn-sm btn-outline-success" onclick="markMessageRead('${m.id}')">
-              <i class="bi bi-check"></i>
-            </button>
-          </div>
-          <small class="text-muted">${new Date(m.createdAt).toLocaleString()}</small>
-        </div>
-      `;
-    }));
-
-    messagesList.innerHTML = messageHtml.join('');
-  } catch (error) {
-    console.error('Failed to load messages:', error);
-    messagesList.innerHTML = '<p class="text-danger text-center">Failed to load messages</p>';
-  }
-}
-
-async function markMessageRead(messageId) {
-  try {
-    await API.markMessageRead(messageId);
-    await loadMessages();
-  } catch (error) {
-    console.error('Failed to mark message as read:', error);
-    showAlert('Failed to mark message as read.', 'danger');
-  }
-}
 
 async function checkAlerts() {
   try {
@@ -629,18 +845,52 @@ async function generateQrForUser(userId) {
 // Initialize on load
 document.addEventListener('DOMContentLoaded', function() {
   if (window.location.pathname.includes('admin.html')) {
+    // Verify admin authentication before loading dashboard
+    const userId = localStorage.getItem('currentUserId');
+    const userClassification = localStorage.getItem('userClassification');
+    
+    if (!userId || userClassification !== 'admin') {
+      // Not logged in as admin, redirect will happen in admin.html script
+      // Don't load dashboard or show notifications
+      return;
+    }
+    
     loadDashboard();
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds (only if admin is logged in)
     setInterval(async () => {
+      // Re-check admin status before refresh
+      const currentUserId = localStorage.getItem('currentUserId');
+      const currentClassification = localStorage.getItem('userClassification');
+      
+      if (!currentUserId || currentClassification !== 'admin') {
+        return; // Stop refreshing if no longer admin
+      }
+      
       try {
         allVerifications = await API.getVerifications();
         await updateStats();
         await displayCases();
-        await loadMessages();
       } catch (error) {
         console.error('Failed to refresh dashboard:', error);
       }
     }, 30000);
   }
 });
+
+// Check if user is admin on page load (for admin.html)
+(function checkAdminAuth() {
+  // Only run on admin.html
+  if (!window.location.pathname.includes('admin.html')) {
+    return;
+  }
+  
+  const userId = localStorage.getItem('currentUserId');
+  const userClassification = localStorage.getItem('userClassification');
+  
+  if (!userId || userClassification !== 'admin') {
+    // Not logged in as admin, redirect to index
+    localStorage.clear();
+    window.location.replace('index.html');
+  }
+})();

@@ -40,7 +40,7 @@ async function sendMessageToAdmin(subject, message, userId) {
   }
 }
 
-// Initialize message form on passport page
+// Initialize message form
 document.addEventListener('DOMContentLoaded', function() {
   const messageForm = document.getElementById('messageForm');
   if (messageForm) {
