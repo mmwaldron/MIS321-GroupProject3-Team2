@@ -43,147 +43,8 @@ function showAlert(message, type = 'info') {
   }, 7000);
 }
 
-// Format passport code input (numbers only)
-function formatPassportCode(input) {
-  // Remove any non-numeric characters
-  input.value = input.value.replace(/\D/g, '').slice(0, 10);
-}
-
-// Handle QR code upload
-async function handleQRUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  try {
-    showAlert('Processing QR code...', 'info');
-    
-    // Create image element to decode QR
-    const img = new Image();
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    img.onload = async function() {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-      
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Use jsQR to decode (loaded via CDN)
-      if (typeof jsQR === 'undefined') {
-        showAlert('QR code decoder not loaded. Please refresh the page.', 'danger');
-        return;
-      }
-      
-      const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-      
-      if (!qrCode) {
-        showAlert('Could not decode QR code. Please ensure the image is clear and try again.', 'danger');
-        return;
-      }
-      
-      const code = qrCode.data.trim();
-      
-      // Verify the code format
-      if (!code || code.length !== 10 || !/^\d{10}$/.test(code)) {
-        showAlert('Invalid passport code in QR code. Please contact admin.', 'danger');
-        return;
-      }
-      
-      // Verify and login with the code
-      try {
-        const passport = await API.verifyQRCode(code);
-        
-        if (!passport || !passport.verified) {
-          showAlert('This passport has not been verified yet. Please wait for admin approval.', 'warning');
-          return;
-        }
-
-        // Store code and check user classification
-        localStorage.setItem('currentPassportCode', code);
-        localStorage.setItem('currentUserId', passport.userId);
-        
-        // Get user details to check classification
-        try {
-          const user = await API.getUser(passport.userId);
-          if (user && user.classification === 'admin') {
-            localStorage.setItem('userClassification', 'admin');
-            window.location.href = 'admin.html';
-          } else {
-            localStorage.setItem('userClassification', 'user');
-            window.location.href = 'dashboard.html';
-          }
-        } catch (error) {
-          // Default to dashboard if classification check fails
-          localStorage.setItem('userClassification', 'user');
-          window.location.href = 'dashboard.html';
-        }
-      } catch (error) {
-        showAlert('Invalid QR code. Please verify the file and try again.', 'danger');
-      }
-    };
-    
-    img.onerror = function() {
-      showAlert('Failed to load image. Please ensure it is a valid image file.', 'danger');
-    };
-    
-    img.src = URL.createObjectURL(file);
-  } catch (error) {
-    console.error('Error processing QR code:', error);
-    showAlert('Error processing QR code. Please try again.', 'danger');
-  }
-}
-
-// Lookup passport by code
-async function lookupPassport(event) {
-  event.preventDefault();
-  
-  const passportCodeInput = document.getElementById('passportCodeInput');
-  if (!passportCodeInput) {
-    console.error('Passport code input not found');
-    showAlert('Form field not found. Please refresh the page.', 'danger');
-    return;
-  }
-  
-  const code = passportCodeInput.value.trim();
-  
-  if (!code || code.length !== 10 || !/^\d{10}$/.test(code)) {
-    showAlert('Please enter a valid 10-digit passport code.', 'danger');
-    return;
-  }
-
-  try {
-    // Find passport by code via API
-    const passport = await API.getPassportByCode(code);
-    
-    if (!passport || !passport.verified) {
-      showAlert('This passport has not been verified yet. Please wait for admin approval.', 'warning');
-      return;
-    }
-
-    // Store code and check user classification
-    localStorage.setItem('currentPassportCode', code);
-    localStorage.setItem('currentUserId', passport.userId);
-    
-    // Get user details to check classification
-    try {
-      const user = await API.getUser(passport.userId);
-      if (user && user.classification === 'admin') {
-        localStorage.setItem('userClassification', 'admin');
-        window.location.href = 'admin.html';
-      } else {
-        localStorage.setItem('userClassification', 'user');
-        window.location.href = 'dashboard.html';
-      }
-    } catch (error) {
-      // Default to dashboard if classification check fails
-      localStorage.setItem('userClassification', 'user');
-      window.location.href = 'dashboard.html';
-    }
-  } catch (error) {
-    showAlert('Passport code not found. Please verify your code and try again.', 'danger');
-  }
-}
+// Note: QR code login is now handled in qrLogin.js
+// Old passport code system has been removed
 
 // Check user status and display banner
 async function checkUserStatus() {
@@ -270,7 +131,6 @@ async function adminLogin(event) {
 function logout() {
   // Clear all localStorage data
   localStorage.removeItem('currentUserId');
-  localStorage.removeItem('currentPassportCode');
   localStorage.removeItem('currentUserEmail');
   localStorage.removeItem('userStatus');
   localStorage.removeItem('userClassification');
@@ -280,13 +140,29 @@ function logout() {
   window.location.href = 'index.html';
 }
 
-// Check for alerts on page load
+// Check for alerts on page load - ONLY when user is logged in as admin
+// Note: admin.html has its own alert checking in admin.js, so we skip it there to avoid duplicates
 document.addEventListener('DOMContentLoaded', async function() {
   // Check user status first
   await checkUserStatus();
   
+  // Skip alert checking on admin.html (admin.js handles it)
+  const isAdminPage = window.location.pathname.includes('admin.html');
+  if (isAdminPage) {
+    return; // admin.js will handle alerts on admin.html
+  }
+  
+  // Only check for alerts if user is logged in as admin (and not on admin.html)
+  const userClassification = localStorage.getItem('userClassification');
+  const isAdmin = userClassification === 'admin';
+  
+  if (!isAdmin) {
+    // Not logged in as admin - don't show alerts
+    return;
+  }
+  
   try {
-    // Check for unread alerts
+    // Check for unread alerts (only for admins, on non-admin pages)
     const alerts = await API.getUnreadAlerts();
     alerts.forEach(async (alert) => {
       if (alert.priority === 'high') {
@@ -306,4 +182,30 @@ document.addEventListener('DOMContentLoaded', async function() {
     console.error('Failed to load alerts:', error);
   }
 });
+
+// Check if user is logged in and redirect appropriately (for index.html)
+// Only redirect if user has BOTH userId AND userClassification (meaning they logged in via QR/admin)
+(function checkLoginAndRedirect() {
+  // Only run on index.html
+  if (!window.location.pathname.includes('index.html') && window.location.pathname !== '/') {
+    return;
+  }
+  
+  const userId = localStorage.getItem('currentUserId');
+  const userClassification = localStorage.getItem('userClassification');
+  
+  // Only redirect if user is actually logged in (has both userId and classification)
+  // Users who just submitted verification won't have userClassification, so they won't be redirected
+  if (userId && userClassification) {
+    if (userClassification === 'admin') {
+      window.location.replace('admin.html');
+    } else if (userClassification === 'user') {
+      window.location.replace('dashboard.html');
+    }
+  }
+  // If userId exists but no classification, clear it (user submitted verification but didn't log in)
+  else if (userId && !userClassification) {
+    localStorage.removeItem('currentUserId');
+  }
+})();
 

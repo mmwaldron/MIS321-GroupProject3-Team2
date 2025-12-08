@@ -38,25 +38,28 @@ function goToStep(step) {
     targetStep.classList.add('active');
     currentStep = step;
     
-    // Initialize CAPTCHA if we're on step 2.75
-    if (step === 2.75 && typeof grecaptcha !== 'undefined' && !window.captchaWidgetId) {
+    // Initialize CAPTCHA if we're on step 1
+    if (step === 1 && typeof grecaptcha !== 'undefined' && !window.captchaWidgetId) {
       const captchaContainer = document.getElementById('captchaContainer');
       if (captchaContainer && captchaContainer.children.length === 0) {
+        // Get site key from environment or use test key
+        const siteKey = '6LesjSQsAAAAAIF02PbHdIa9j5ds-JvTxpWYp1Zh'; // Test key - replace with your actual key from environment
+        
         window.captchaWidgetId = grecaptcha.render('captchaContainer', {
-          'sitekey': '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI', // Test key - replace with your actual key
+          'sitekey': siteKey,
           'callback': function(token) {
-            const captchaSubmitBtn = document.getElementById('captchaSubmitBtn');
-            if (captchaSubmitBtn) {
-              captchaSubmitBtn.disabled = false;
+            const basicInfoSubmitBtn = document.getElementById('basicInfoSubmitBtn');
+            if (basicInfoSubmitBtn) {
+              basicInfoSubmitBtn.disabled = false;
             }
             if (window.verificationData) {
               window.verificationData.captchaToken = token;
             }
           },
           'expired-callback': function() {
-            const captchaSubmitBtn = document.getElementById('captchaSubmitBtn');
-            if (captchaSubmitBtn) {
-              captchaSubmitBtn.disabled = true;
+            const basicInfoSubmitBtn = document.getElementById('basicInfoSubmitBtn');
+            if (basicInfoSubmitBtn) {
+              basicInfoSubmitBtn.disabled = true;
             }
             if (window.verificationData) {
               window.verificationData.captchaToken = null;
@@ -81,9 +84,49 @@ document.addEventListener('DOMContentLoaded', function() {
     window.verificationData = verificationData;
   }
   
+  // Initialize CAPTCHA on page load if Step 1 is active
+  function initializeCaptcha() {
+    if (currentStep === 1 && !window.captchaWidgetId) {
+      const captchaContainer = document.getElementById('captchaContainer');
+      if (captchaContainer && captchaContainer.children.length === 0) {
+        if (typeof grecaptcha !== 'undefined') {
+          const siteKey = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'; // Test key - replace with your actual key
+          
+          window.captchaWidgetId = grecaptcha.render('captchaContainer', {
+            'sitekey': siteKey,
+            'callback': function(token) {
+              const basicInfoSubmitBtn = document.getElementById('basicInfoSubmitBtn');
+              if (basicInfoSubmitBtn) {
+                basicInfoSubmitBtn.disabled = false;
+              }
+              if (window.verificationData) {
+                window.verificationData.captchaToken = token;
+              }
+            },
+            'expired-callback': function() {
+              const basicInfoSubmitBtn = document.getElementById('basicInfoSubmitBtn');
+              if (basicInfoSubmitBtn) {
+                basicInfoSubmitBtn.disabled = true;
+              }
+              if (window.verificationData) {
+                window.verificationData.captchaToken = null;
+              }
+            }
+          });
+        } else {
+          // reCAPTCHA script not loaded yet, try again
+          setTimeout(initializeCaptcha, 200);
+        }
+      }
+    }
+  }
+  
+  // Try to initialize CAPTCHA after a short delay to ensure script is loaded
+  setTimeout(initializeCaptcha, 500);
+  
   const basicInfoForm = document.getElementById('basicInfoForm');
   if (basicInfoForm) {
-    basicInfoForm.addEventListener('submit', function(e) {
+    basicInfoForm.addEventListener('submit', async function(e) {
       e.preventDefault();
       
       try {
@@ -109,6 +152,43 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         
+        // Validate CAPTCHA is completed
+        if (!verificationData.captchaToken) {
+          showAlert('Please complete the security verification (CAPTCHA) before continuing.', 'danger');
+          return;
+        }
+        
+        // Verify CAPTCHA on server before proceeding
+        try {
+          const captchaResponse = await API.verifyCaptcha(verificationData.captchaToken);
+          if (!captchaResponse.success) {
+            showAlert('Security verification failed. Please try again.', 'danger');
+            // Reset CAPTCHA
+            if (window.captchaWidgetId && typeof grecaptcha !== 'undefined') {
+              grecaptcha.reset(window.captchaWidgetId);
+            }
+            const basicInfoSubmitBtn = document.getElementById('basicInfoSubmitBtn');
+            if (basicInfoSubmitBtn) {
+              basicInfoSubmitBtn.disabled = true;
+            }
+            verificationData.captchaToken = null;
+            return;
+          }
+        } catch (captchaError) {
+          console.error('Error verifying CAPTCHA:', captchaError);
+          showAlert('Failed to verify security check. Please try again.', 'danger');
+          // Reset CAPTCHA
+          if (window.captchaWidgetId && typeof grecaptcha !== 'undefined') {
+            grecaptcha.reset(window.captchaWidgetId);
+          }
+          const basicInfoSubmitBtn = document.getElementById('basicInfoSubmitBtn');
+          if (basicInfoSubmitBtn) {
+            basicInfoSubmitBtn.disabled = true;
+          }
+          verificationData.captchaToken = null;
+          return;
+        }
+        
         // Get and validate first and last name individually
         const firstName = firstNameInput.value.trim() || '';
         const lastName = lastNameInput.value.trim() || '';
@@ -130,7 +210,9 @@ document.addEventListener('DOMContentLoaded', function() {
           name: fullName,
           firstName: firstName,
           lastName: lastName,
-          email: emailInput.value || ''
+          email: emailInput.value || '',
+          captchaToken: verificationData.captchaToken, // Keep CAPTCHA token for backend verification
+          captchaVerified: true
         };
         window.verificationData = verificationData; // Update global reference
         goToStep(2);
@@ -149,70 +231,169 @@ document.addEventListener('DOMContentLoaded', function() {
       
       try {
         // Get form elements with null checks
+        const idTypeSelect = document.getElementById('idType');
         const fileInput = document.getElementById('verificationDoc');
         const companyEmailInput = document.getElementById('companyEmail');
         const govIdInput = document.getElementById('govId');
+        const idNumberInput = document.getElementById('idNumber');
         
         // Validate elements exist
+        if (!idTypeSelect) {
+          console.error('ID type select not found');
+          showAlert('ID type field not found. Please refresh the page.', 'danger');
+          return;
+        }
+        
+        if (!fileInput) {
+          console.error('File input not found');
+          showAlert('Document upload field not found. Please refresh the page.', 'danger');
+          return;
+        }
+        
         if (!companyEmailInput) {
           console.error('Company email input not found');
           showAlert('Company email field not found. Please refresh the page.', 'danger');
           return;
         }
         
-        if (!govIdInput) {
-          console.error('Government ID input not found');
-          showAlert('Government ID field not found. Please refresh the page.', 'danger');
+        // Validate ID type selected
+        if (!idTypeSelect.value) {
+          showAlert('Please select your government ID type', 'danger');
+          return;
+        }
+        
+        // Validate file uploaded
+        if (!fileInput.files || fileInput.files.length === 0) {
+          showAlert('Please upload your government-issued ID', 'danger');
+          return;
+        }
+        
+        const file = fileInput.files[0];
+        
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+        if (!allowedTypes.includes(file.type)) {
+          showAlert('Invalid file type. Please upload JPG, PNG, or PDF', 'danger');
+          return;
+        }
+        
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          showAlert('File size exceeds 10MB limit', 'danger');
           return;
         }
         
         const companyEmail = companyEmailInput.value || '';
-      
-      // Validate company email format
-      if (!isValidEmail(companyEmail)) {
-        showAlert('Please enter a valid company email address.', 'danger');
-        return;
-      }
-      
-        verificationData = {
-          ...verificationData,
-          govId: govIdInput.value || '',
-          hasDocument: fileInput && fileInput.files.length > 0,
-          companyEmail: companyEmail
-        };
-        window.verificationData = verificationData; // Update global reference
+        const govId = govIdInput ? govIdInput.value || '' : '';
+        
+        // Get or create user first
+        let userId;
+        let verificationId;
         
         try {
-        // Run risk assessment
-        const riskAssessment = RiskFilter.calculateRiskScore(verificationData);
-        const urgency = RiskFilter.calculateUrgency(verificationData, riskAssessment.score);
-        const credibility = RiskFilter.calculateCredibility(verificationData);
-        const trustScore = TrustScore.calculateInitialScore(verificationData, riskAssessment);
-        
-        // Create pending user account
-        showAlert('Creating your account...', 'info');
-        const response = await API.registerPendingUser({
-          name: verificationData.name,
-          email: verificationData.email,
-          phone: null, // Optional - not required
-          organization: null, // Optional - not required
-          govId: verificationData.govId || null,
-          hasDocument: verificationData.hasDocument,
-          companyEmail: companyEmail || null,
-          riskScore: riskAssessment.score,
-          riskLevel: riskAssessment.level,
-          urgency: urgency,
-          credibility: credibility,
-          trustScore: trustScore,
-          factors: riskAssessment.factors
-        });
+          // Check if user exists
+          let user;
+          try {
+            user = await API.getUserByEmail(verificationData.email);
+            userId = user.id;
+          } catch (error) {
+            // User doesn't exist, create one
+            const createUserResponse = await API.createUser({
+              email: verificationData.email,
+              password: '' // No password needed for QR-based auth
+            });
+            userId = createUserResponse.id;
+          }
+          
+          // Upload and analyze document
+          showAlert('Uploading and analyzing your ID...', 'info');
+          
+          const formData = new FormData();
+          formData.append('document', file);
+          formData.append('idType', idTypeSelect.value);
+          formData.append('userId', userId);
+          
+          const uploadResponse = await fetch(API_CONFIG.getUrl('/verifications/upload-id'), {
+            method: 'POST',
+            body: formData
+          });
+          
+          const uploadResult = await uploadResponse.json();
+          
+          if (!uploadResult.success) {
+            showAlert(uploadResult.message || 'Failed to upload ID', 'danger');
+            return;
+          }
+          
+          verificationId = uploadResult.verificationId;
+          const idAnalysis = uploadResult.analysis;
+          const documentAnalysis = uploadResult.documentAnalysis;
+          
+          console.log('Document uploaded successfully. Verification ID:', verificationId, 'Document ID:', uploadResult.documentId);
+          
+          // Store extracted ID number if available
+          const extractedIdNumber = idAnalysis.extractedFields?.idNumber || idNumberInput?.value || '';
+          
+          verificationData = {
+            ...verificationData,
+            idType: idTypeSelect.value,
+            documentId: uploadResult.documentId,
+            idAnalysis: idAnalysis,
+            documentAnalysis: documentAnalysis,
+            idNumber: extractedIdNumber,
+            govId: govId,
+            hasDocument: true,
+            companyEmail: companyEmail
+          };
+          window.verificationData = verificationData;
+          
+          // Check if ID validation passed
+          if (!idAnalysis.isValid) {
+            const highRiskFlags = idAnalysis.flags.filter(f => f.severity === 'high');
+            if (highRiskFlags.length > 0) {
+              showAlert(
+                `ID validation warning: ${highRiskFlags[0].message}. Your verification will require manual review.`,
+                'warning'
+              );
+            }
+          }
+          
+          // Run risk assessment
+          const riskAssessment = RiskFilter.calculateRiskScore(verificationData);
+          const urgency = RiskFilter.calculateUrgency(verificationData, riskAssessment.score);
+          const credibility = RiskFilter.calculateCredibility(verificationData);
+          const trustScore = TrustScore.calculateInitialScore(verificationData, riskAssessment);
+          
+          // Update verification record with full data
+          // Pass the verificationId from document upload so documents stay linked
+          showAlert('Completing verification...', 'info');
+          const response = await API.registerPendingUser({
+            name: verificationData.name,
+            email: verificationData.email,
+            phone: null,
+            organization: null,
+            govId: govId || extractedIdNumber || null,
+            hasDocument: true,
+            companyEmail: companyEmail || null,
+            riskScore: riskAssessment.score,
+            riskLevel: riskAssessment.level,
+            urgency: urgency,
+            credibility: credibility,
+            trustScore: trustScore,
+            factors: riskAssessment.factors,
+            verificationId: verificationId, // Pass the verification ID from document upload
+            captchaToken: verificationData.captchaToken // Pass CAPTCHA token for backend verification
+          });
         
         if (response.success) {
-          // Store user info in localStorage
-          localStorage.setItem('currentUserId', response.userId);
+          // DO NOT store currentUserId - user is not logged in until they use QR code
+          // Only store email and verificationId for status checking purposes
           localStorage.setItem('currentUserEmail', verificationData.email);
           localStorage.setItem('userStatus', 'pending');
           localStorage.setItem('verificationId', response.verificationId);
+          // Clear any existing userId to ensure user is not considered "logged in"
+          localStorage.removeItem('currentUserId');
+          localStorage.removeItem('userClassification');
           
           // Create alert for admin if high risk
           try {
@@ -240,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
           // Show processing step, then result
           goToStep(4);
           setTimeout(() => {
-            goToStep(5);
+            goToStep(4);
             displayPendingApprovalResult(response.userId, response.verificationId);
           }, 1500);
         } else {
@@ -550,7 +731,7 @@ async function completeVerification() {
     }
 
     // Show result
-    goToStep(5);
+    goToStep(4);
     displayVerificationResult(user, verification, riskAssessment);
   } catch (error) {
     console.error('Verification failed:', error);
@@ -570,19 +751,17 @@ function displayPendingApprovalResult(userId, verificationId) {
   }
 
   resultIcon.innerHTML = '<i class="bi bi-hourglass-split text-warning" style="font-size: 4rem;"></i>';
-  resultTitle.textContent = 'Account Pending Approval';
+  resultTitle.textContent = 'Verification Submitted';
   resultTitle.className = 'mb-3 text-warning';
   resultMessage.innerHTML = `
-    <p>Your account has been created and is pending admin approval.</p>
-    <p class="mb-0">You are logged in, but access to the portal is restricted until your account is approved.</p>
+    <p>Your verification request has been submitted successfully.</p>
+    <p class="mb-0">Your account is pending admin approval.</p>
     <p class="mt-2 mb-0"><strong>Once approved, you will receive your QR Passport from the admin.</strong></p>
+    <p class="mt-2 mb-0 text-muted"><small>You can check your status anytime using the "Check Verification Status" section above.</small></p>
   `;
   resultActions.innerHTML = `
-    <button class="btn btn-success" onclick="window.location.href='dashboard.html'">
-      Go to Dashboard
-    </button>
-    <button class="btn btn-outline-secondary ms-2" onclick="checkAccountStatus()">
-      Check Status
+    <button class="btn btn-outline-light btn-lg px-4" onclick="returnToHome()">
+      <i class="bi bi-house"></i> Return Home
     </button>
   `;
 }
@@ -600,18 +779,26 @@ function displayVerificationResult(user, verification, riskAssessment) {
 
   // Always require admin review - no auto-approval
   resultIcon.innerHTML = '<i class="bi bi-hourglass-split text-warning" style="font-size: 4rem;"></i>';
-  resultTitle.textContent = 'Under Review';
+  resultTitle.textContent = 'Verification Submitted';
   resultTitle.className = 'mb-3 text-warning';
-  resultMessage.textContent = 'Your verification is under review by our security team. Once approved, you will receive a QR Passport code to access your account.';
+  resultMessage.innerHTML = `
+    <p>Your verification request has been submitted successfully.</p>
+    <p class="mb-0">Your account is pending admin approval.</p>
+    <p class="mt-2 mb-0"><strong>Once approved, you will receive your QR Passport from the admin.</strong></p>
+    <p class="mt-2 mb-0 text-muted"><small>You can check your status anytime using the "Check Verification Status" section above.</small></p>
+  `;
   resultActions.innerHTML = `
-    <button class="btn btn-outline-success" onclick="window.location.reload()">
-      Check Status Later
+    <button class="btn btn-outline-light btn-lg px-4" onclick="returnToHome()">
+      <i class="bi bi-house"></i> Return Home
     </button>
   `;
 
-  // Store current user for later
-  localStorage.setItem('currentUserId', user.id);
+  // DO NOT store currentUserId - user is not logged in until they use QR code
+  // Only store verificationId for status checking purposes
   localStorage.setItem('verificationId', verification.id);
+  // Clear any existing userId to ensure user is not considered "logged in"
+  localStorage.removeItem('currentUserId');
+  localStorage.removeItem('userClassification');
 }
 
 async function checkAccountStatus() {
@@ -624,26 +811,15 @@ async function checkAccountStatus() {
   try {
     const user = await API.getUser(userId);
     if (user.verified) {
-      // User is approved, check for passport code
+      // User is approved, check verification status
       const verifications = await API.getVerificationsByUserId(userId);
       const latestVerification = verifications && verifications.length > 0 ? verifications[0] : null;
       
       if (latestVerification && latestVerification.status === 'approved') {
-        // Get passport code from passport endpoint
-        try {
-          // The passport code would be available after admin approval
-          showAlert('Your account has been approved! Redirecting to dashboard...', 'success');
-          localStorage.setItem('userStatus', 'approved');
-          setTimeout(() => {
-            window.location.href = 'dashboard.html';
-          }, 1500);
-        } catch (error) {
-          showAlert('Account approved! Redirecting to dashboard...', 'success');
-          localStorage.setItem('userStatus', 'approved');
-          setTimeout(() => {
-            window.location.href = 'dashboard.html';
-          }, 1500);
-        }
+        // User is approved - but they must log in with QR code to access dashboard
+        showAlert('Your account has been approved! Please log in with your QR Passport to access the dashboard.', 'success');
+        localStorage.setItem('userStatus', 'approved');
+        // Don't route to dashboard - user must log in with QR code first
       } else {
         showAlert('Your account is still pending approval.', 'info');
       }
@@ -658,6 +834,164 @@ async function checkAccountStatus() {
 
 // Make checkAccountStatus available globally
 window.checkAccountStatus = checkAccountStatus;
+
+// Check verification status by email
+async function checkVerificationStatus(event) {
+  if (event) {
+    event.preventDefault();
+  }
+
+  const emailInput = document.getElementById('statusCheckEmail');
+  const resultDiv = document.getElementById('statusCheckResult');
+  
+  if (!emailInput || !resultDiv) {
+    console.error('Status check elements not found');
+    return;
+  }
+
+  const email = emailInput.value.trim();
+  if (!email) {
+    showAlert('Please enter an email address', 'warning');
+    return;
+  }
+
+  try {
+    // Show loading state
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+      <div class="text-center py-3">
+        <div class="spinner-border text-success" role="status">
+          <span class="visually-hidden">Checking...</span>
+        </div>
+        <p class="mt-2 text-muted">Checking status...</p>
+      </div>
+    `;
+
+    // Get user by email
+    let user;
+    try {
+      user = await API.getUserByEmail(email);
+    } catch (error) {
+      // User not found - this is expected for users who haven't registered
+      console.log('User not found for email:', email);
+      resultDiv.innerHTML = `
+        <div class="card bg-dark border-warning">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-exclamation-circle text-warning" style="font-size: 3rem;"></i>
+            <h5 class="mt-3 mb-2 text-warning">Not on Record</h5>
+            <p class="text-muted mb-0">No verification request found for this email address.</p>
+            <p class="text-muted mt-2 mb-0"><small>If you believe this is an error, please submit a new verification request below.</small></p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // Get verifications for this user
+    let verifications = [];
+    try {
+      verifications = await API.getVerificationsByUserId(user.id);
+    } catch (error) {
+      console.error('Failed to fetch verifications:', error);
+    }
+
+    const latestVerification = verifications && verifications.length > 0 ? verifications[0] : null;
+
+    if (!latestVerification) {
+      // No verification found
+      resultDiv.innerHTML = `
+        <div class="card bg-dark border-warning">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-exclamation-circle text-warning" style="font-size: 3rem;"></i>
+            <h5 class="mt-3 mb-2 text-warning">Not on Record</h5>
+            <p class="text-muted mb-0">No verification request found for this email address.</p>
+            <p class="text-muted mt-2 mb-0"><small>If you believe this is an error, please submit a new verification request below.</small></p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // Check verification status
+    if (latestVerification.status === 'approved' && user.verified) {
+      // Approved
+      resultDiv.innerHTML = `
+        <div class="card bg-dark border-success">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+            <h5 class="mt-3 mb-2 text-success">Verification Approved</h5>
+            <p class="text-muted mb-2">Your verification has been approved!</p>
+            <p class="text-success mb-0"><strong>You should be receiving your login credentials (QR Passport) from the admin shortly.</strong></p>
+            <p class="text-muted mt-3 mb-0"><small>Once you receive your QR Passport, you can use it to log in to your account.</small></p>
+          </div>
+        </div>
+      `;
+    } else if (latestVerification.status === 'pending') {
+      // Pending
+      resultDiv.innerHTML = `
+        <div class="card bg-dark border-warning">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-hourglass-split text-warning" style="font-size: 3rem;"></i>
+            <h5 class="mt-3 mb-2 text-warning">Verification Pending</h5>
+            <p class="text-muted mb-2">Your verification request is currently under review.</p>
+            <p class="text-muted mb-0"><strong>Please wait for admin approval. You will receive your QR Passport once your verification is approved.</strong></p>
+            <p class="text-muted mt-3 mb-0"><small>You can check back here anytime to see your status.</small></p>
+          </div>
+        </div>
+      `;
+    } else if (latestVerification.status === 'rejected' || latestVerification.status === 'denied') {
+      // Rejected
+      resultDiv.innerHTML = `
+        <div class="card bg-dark border-danger">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-x-circle text-danger" style="font-size: 3rem;"></i>
+            <h5 class="mt-3 mb-2 text-danger">Verification Denied</h5>
+            <p class="text-muted mb-0">Your verification request has been denied.</p>
+            <p class="text-muted mt-2 mb-0"><small>If you believe this is an error, please contact support or submit a new verification request.</small></p>
+          </div>
+        </div>
+      `;
+    } else {
+      // Unknown status
+      resultDiv.innerHTML = `
+        <div class="card bg-dark border-secondary">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-question-circle text-secondary" style="font-size: 3rem;"></i>
+            <h5 class="mt-3 mb-2">Status Unknown</h5>
+            <p class="text-muted mb-0">Unable to determine verification status. Please contact support.</p>
+          </div>
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Error checking verification status:', error);
+    resultDiv.innerHTML = `
+      <div class="card bg-dark border-danger">
+        <div class="card-body text-center py-4">
+          <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+          <h5 class="mt-3 mb-2 text-danger">Error</h5>
+          <p class="text-muted mb-0">Failed to check verification status. Please try again.</p>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// Make checkVerificationStatus available globally
+window.checkVerificationStatus = checkVerificationStatus;
+
+// Return to home page (clears any login state)
+function returnToHome() {
+  // Clear any login-related localStorage items
+  localStorage.removeItem('currentUserId');
+  localStorage.removeItem('userClassification');
+  // Keep verificationId and email for status checking
+  // Navigate to index.html
+  window.location.href = 'index.html';
+}
+
+// Make returnToHome available globally
+window.returnToHome = returnToHome;
 
 async function updateTrustScoreDisplay(userId) {
   try {

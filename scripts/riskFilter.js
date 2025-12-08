@@ -2,6 +2,14 @@
 const RiskFilter = {
   // Calculate risk score based on multiple factors
   calculateRiskScore(verificationData) {
+    if (!verificationData) {
+      return {
+        score: 50, // Default risk if no data
+        level: 'medium',
+        factors: {}
+      };
+    }
+    
     let riskScore = 0;
     const factors = {
       emailDomain: this.checkEmailDomain(verificationData.email),
@@ -31,6 +39,8 @@ const RiskFilter = {
 
   // Calculate urgency score (0-100)
   calculateUrgency(verificationData, riskScore) {
+    if (!verificationData) return 0;
+    
     let urgency = 0;
 
     // High risk = high urgency
@@ -38,9 +48,15 @@ const RiskFilter = {
     else if (riskScore >= 40) urgency += 20;
 
     // Recent creation = higher urgency
-    const hoursSinceCreation = (Date.now() - new Date(verificationData.createdAt).getTime()) / (1000 * 60 * 60);
-    if (hoursSinceCreation < 1) urgency += 30;
-    else if (hoursSinceCreation < 24) urgency += 15;
+    if (verificationData.createdAt) {
+      try {
+        const hoursSinceCreation = (Date.now() - new Date(verificationData.createdAt).getTime()) / (1000 * 60 * 60);
+        if (hoursSinceCreation < 1) urgency += 30;
+        else if (hoursSinceCreation < 24) urgency += 15;
+      } catch (e) {
+        // Invalid date, skip this factor
+      }
+    }
 
     // Suspicious patterns
     if (this.hasSuspiciousPatterns(verificationData)) urgency += 30;
@@ -50,12 +66,14 @@ const RiskFilter = {
 
   // Calculate credibility score (0-100)
   calculateCredibility(verificationData) {
+    if (!verificationData) return 50; // Default credibility if no data
+    
     let credibility = 50; // Base credibility
 
     // Positive factors
     if (verificationData.hasDocument) credibility += 20;
     if (verificationData.emailVerified) credibility += 15;
-    if (this.isValidEmailDomain(verificationData.email)) credibility += 10;
+    if (verificationData.email && this.isValidEmailDomain(verificationData.email)) credibility += 10;
     if (verificationData.organization && this.isValidOrganization(verificationData.organization)) credibility += 10;
 
     // Negative factors
@@ -75,6 +93,9 @@ const RiskFilter = {
 
   // Check email domain
   checkEmailDomain(email) {
+    // Handle null/undefined email
+    if (!email || typeof email !== 'string') return 0;
+    
     const suspiciousDomains = ['tempmail', 'throwaway', '10minutemail', 'guerrillamail'];
     const domain = email.split('@')[1]?.toLowerCase() || '';
     
@@ -95,7 +116,7 @@ const RiskFilter = {
 
   // Check government ID format
   checkGovIdFormat(govId) {
-    if (!govId || govId.length < 4) return 25;
+    if (!govId || typeof govId !== 'string' || govId.length < 4) return 25;
     if (/^\d{4}$/.test(govId)) return 0;
     return 10;
   },
@@ -113,21 +134,22 @@ const RiskFilter = {
   // Check for suspicious patterns
   hasSuspiciousPatterns(verificationData) {
     // Check for repeated characters or patterns
-    const name = verificationData.name || '';
-    const email = verificationData.email || '';
+    const name = (verificationData?.name && typeof verificationData.name === 'string') ? verificationData.name : '';
+    const email = (verificationData?.email && typeof verificationData.email === 'string') ? verificationData.email : '';
     
     // Repeated characters
-    if (/(.)\1{4,}/.test(name)) return true;
-    if (/(.)\1{4,}/.test(email)) return true;
+    if (name && /(.)\1{4,}/.test(name)) return true;
+    if (email && /(.)\1{4,}/.test(email)) return true;
 
     // Sequential patterns
-    if (/12345|abcde|qwerty/i.test(name)) return true;
+    if (name && /12345|abcde|qwerty/i.test(name)) return true;
 
     return false;
   },
 
   // Validate email domain
   isValidEmailDomain(email) {
+    if (!email || typeof email !== 'string') return false;
     const domain = email.split('@')[1];
     if (!domain) return false;
     return domain.includes('.') && domain.length > 3;

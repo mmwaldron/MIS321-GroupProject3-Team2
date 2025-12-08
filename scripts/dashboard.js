@@ -37,7 +37,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     // User is approved - show dashboard
     showDashboardContent();
     
-    // Load alerts on page load
+    // Automatically trigger NVD ingestion on dashboard load
+    await triggerIngestionAutomatically();
+    
+    // Load alerts on page load (after ingestion completes)
     await loadAlerts();
 
     // Set up tab switching to load profile when profile tab is clicked
@@ -458,9 +461,33 @@ async function loadProfile() {
   }
 }
 
+// Automatically trigger NVD ingestion (called on dashboard load)
+async function triggerIngestionAutomatically() {
+  try {
+    console.log('Starting automatic NVD ingestion...');
+    const result = await API.triggerNvdIngest();
+    if (result.status === 'ok') {
+      console.log(`NVD ingestion completed: ${result.ingested || 0} CVEs ingested`);
+      // Don't show alert for automatic ingestion to avoid UI clutter
+      // Alerts will be refreshed automatically after this function completes
+    } else {
+      console.warn('NVD ingestion completed with issues:', result);
+    }
+  } catch (error) {
+    // Log error but don't show alert for automatic ingestion
+    // This prevents interrupting the user experience on every page load
+    console.error('Error during automatic NVD ingestion:', error);
+  }
+}
+
+// Manual trigger function (kept for backwards compatibility, but button is removed)
 async function triggerIngestion() {
   const ingestBtn = document.getElementById('ingestBtn');
-  if (!ingestBtn) return;
+  if (!ingestBtn) {
+    // If button doesn't exist, just run automatically
+    await triggerIngestionAutomatically();
+    return;
+  }
 
   const originalText = ingestBtn.innerHTML;
   ingestBtn.disabled = true;
